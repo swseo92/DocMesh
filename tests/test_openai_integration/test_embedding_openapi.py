@@ -2,21 +2,23 @@ import os
 import pytest
 from dotenv import load_dotenv
 
+# embedding.py 모듈에서 필요한 클래스들을 임포트합니다.
+from app.embedding import (
+    Document,
+    LangchainOpenAIEmbeddingModel,
+    LangchainFAISSVectorStore,
+    EmbeddingStoreManager,
+)
+
 # .env 파일에서 환경변수 로드
 load_dotenv()
 
 # OpenAI API 키가 없는 경우, 전체 모듈 테스트를 스킵합니다.
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
-    pytest.skip("OPENAI_API_KEY가 설정되어 있지 않아 OpenAI 통합 테스트를 건너뜁니다.", allow_module_level=True)
-
-# embedding.py 모듈에서 필요한 클래스들을 임포트합니다.
-from app.embedding import (
-    Document,
-    LangchainOpenAIEmbeddingModel,
-    LangchainFAISSVectorStore,
-    EmbeddingStoreManager
-)
+    pytest.skip(
+        "OPENAI_API_KEY가 설정되어 있지 않아 OpenAI 통합 테스트를 건너뜁니다.", allow_module_level=True
+    )
 
 
 def test_openai_embedding_model():
@@ -28,7 +30,6 @@ def test_openai_embedding_model():
     # 반환된 임베딩이 리스트이며, 모델의 vector_dim과 동일한 길이를 가져야 합니다.
     assert isinstance(embedding, list)
     assert len(embedding) == model.vector_dim
-
 
 
 def test_openai_pipeline_integration():
@@ -43,10 +44,16 @@ def test_openai_pipeline_integration():
 
     # 테스트용 Document 객체들 생성
     docs = [
-        Document("This is a test document. It contains information about testing OpenAI embeddings.",
-                 {"source": "https://example.com"}),
-        Document("Another test document with more details and different content for integration testing.",
-                 {"source": "https://example.org"})
+        Document(
+            """This is a test document.
+            It contains information about testing OpenAI embeddings.""",
+            {"source": "https://example.com"},
+        ),
+        Document(
+            """Another test document with more details
+            and different content for integration testing.""",
+            {"source": "https://example.org"},
+        ),
     ]
 
     # 문서 임베딩 및 저장

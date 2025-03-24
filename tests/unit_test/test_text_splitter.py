@@ -1,4 +1,3 @@
-import pytest
 from app.text_splitter import DocumentChunkPipeline, default_tokenizer
 
 
@@ -8,7 +7,9 @@ def generate_text(token_count: int, token: str = "word") -> str:
 
 
 def test_merge_chunks():
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     # 동일 source의 두 청크: 각각 200, 300 토큰 → 총 500 토큰이 되어야 함.
     doc1 = {"source": "https://example.com", "text": generate_text(200), "metadata": {}}
     doc2 = {"source": "https://example.com", "text": generate_text(300), "metadata": {}}
@@ -20,7 +21,9 @@ def test_merge_chunks():
 
 
 def test_split_merged_chunks():
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     # 1100 토큰짜리 doc: 이미 충분하므로 merge 단계에서는 변경 없이 그대로 전달된다고 가정.
     doc = {"source": "https://example.com", "text": generate_text(1100), "metadata": {}}
     # split_merged_chunks 단계에서 max_tokens(500)를 초과하는 경우 분할됨.
@@ -35,7 +38,9 @@ def test_split_merged_chunks():
 
 
 def test_apply_overlap():
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     # 두 청크를 생성 (같은 source)
     doc1 = {"source": "https://example.com", "text": generate_text(600), "metadata": {}}
     doc2 = {"source": "https://example.com", "text": generate_text(500), "metadata": {}}
@@ -50,7 +55,9 @@ def test_apply_overlap():
 
 
 def test_process_pipeline():
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     # 모의 입력: 같은 source의 여러 작은 청크와 다른 source의 큰 청크
     doc1 = {"source": "https://example.com", "text": generate_text(200), "metadata": {}}
     doc2 = {"source": "https://example.com", "text": generate_text(300), "metadata": {}}
@@ -67,45 +74,58 @@ def test_process_pipeline():
         tokens = default_tokenizer(doc["text"])
         # min_tokens(500) 미만인 경우는 overlap 단계에서 보정되었는지 확인
         if doc["source"] == "https://example.com":
-            assert len(tokens) >= 500 or len(tokens) == len(default_tokenizer(doc["text"])), (
-                f"https://example.com 청크가 최소 토큰 수를 만족하지 않습니다: {len(tokens)} tokens"
-            )
+            assert len(tokens) >= 500 or len(tokens) == len(
+                default_tokenizer(doc["text"])
+            ), f"https://example.com 청크가 최소 토큰 수를 만족하지 않습니다: {len(tokens)} tokens"
     # 또한, 동일 소스 인접 청크에 대해 overlap이 적용되었는지 확인
     for idx in range(1, len(final_docs)):
         if final_docs[idx]["source"] == final_docs[idx - 1]["source"]:
             prev_tokens = default_tokenizer(final_docs[idx - 1]["text"])
-            expected_overlap = " ".join(prev_tokens[-100:]) if len(prev_tokens) >= 100 else " ".join(prev_tokens)
-            assert final_docs[idx]["text"].startswith(expected_overlap), (
-                f"청크 {idx + 1}에 overlap이 올바르게 적용되지 않았습니다."
+            expected_overlap = (
+                " ".join(prev_tokens[-100:])
+                if len(prev_tokens) >= 100
+                else " ".join(prev_tokens)
             )
+            assert final_docs[idx]["text"].startswith(
+                expected_overlap
+            ), f"청크 {idx + 1}에 overlap이 올바르게 적용되지 않았습니다."
 
-def generate_text(token_count: int, token: str = "word") -> str:
-    return " ".join([token] * token_count)
 
 def test_empty_input():
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     result = pipeline.process([])
     assert result == []
 
+
 def test_single_document_no_overlap():
     # 단일 문서인 경우, overlap은 적용되지 않아야 함.
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     doc = {"source": "https://example.com", "text": generate_text(600), "metadata": {}}
     result = pipeline.process([doc])
     # 결과가 하나의 청크로 유지되거나, split이 일어났더라도 첫 청크는 overlap이 없어야 함.
     assert result[0]["text"] == result[0]["text"].lstrip()  # 앞에 불필요한 공백 없음
 
+
 def test_exact_min_tokens_no_merge():
     # 텍스트가 정확히 min_tokens인 경우, merge가 발생하지 않아야 함.
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     doc = {"source": "https://example.com", "text": generate_text(500), "metadata": {}}
     merged = pipeline.merge_chunks([doc])
     tokens = default_tokenizer(merged[0]["text"])
     assert len(tokens) == 500
 
+
 def test_split_behavior():
     # 텍스트가 max_tokens보다 많이 길 경우, split이 올바르게 분할되는지 확인
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     doc = {"source": "https://example.com", "text": generate_text(1100), "metadata": {}}
     split_docs = pipeline.split_merged_chunks([doc])
     token_counts = [len(default_tokenizer(d["text"])) for d in split_docs]
@@ -114,18 +134,24 @@ def test_split_behavior():
     assert token_counts[1] == 500
     assert token_counts[2] == 100
 
+
 def test_multisource_merging():
     # 서로 다른 source의 문서는 합쳐지지 않아야 합니다.
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     doc1 = {"source": "https://example.com", "text": generate_text(200), "metadata": {}}
     doc2 = {"source": "https://example.org", "text": generate_text(300), "metadata": {}}
     merged = pipeline.merge_chunks([doc1, doc2])
     # 두 개의 문서가 각각 별도로 유지되어야 함
     assert len(merged) == 2
 
+
 def test_split_index_metadata():
     # 분할 시 metadata에 split_index가 올바르게 추가되는지 확인
-    pipeline = DocumentChunkPipeline(max_tokens=500, min_tokens=500, desired_overlap=100)
+    pipeline = DocumentChunkPipeline(
+        max_tokens=500, min_tokens=500, desired_overlap=100
+    )
     doc = {"source": "https://example.com", "text": generate_text(1100), "metadata": {}}
     split_docs = pipeline.split_merged_chunks([doc])
     for idx, d in enumerate(split_docs):

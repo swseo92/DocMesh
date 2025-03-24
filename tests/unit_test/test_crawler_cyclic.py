@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, Mock
 from app.crawler import WebCrawler
 
@@ -24,7 +23,11 @@ def test_cyclic_links_case1(mock_get):
     results = crawler.crawl()
 
     visited_urls = [result["source"] for result in results]
-    assert set(visited_urls) == {"https://example.com/a", "https://example.com/b", "https://example.com/c"}
+    assert set(visited_urls) == {
+        "https://example.com/a",
+        "https://example.com/b",
+        "https://example.com/c",
+    }
     # 중복 방문 없이 3개만 크롤링됨
 
 

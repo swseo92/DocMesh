@@ -1,5 +1,3 @@
-# tests/test_main.py
-import pytest
 from fastapi.testclient import TestClient
 
 # app.main에 FastAPI 인스턴스(app)가 있다고 가정
@@ -8,10 +6,12 @@ from app.main import app
 
 client = TestClient(app)
 
+
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
 
 def test_crawl_endpoint():
     # /crawl 엔드포인트에 POST 요청
@@ -23,6 +23,7 @@ def test_crawl_endpoint():
     data = response.json()
     assert "status" in data
     assert data["status"] == "crawl completed"
+
 
 def test_ask_endpoint():
     # /ask 엔드포인트에 POST로 질문을 던짐

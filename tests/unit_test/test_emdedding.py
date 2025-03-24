@@ -1,12 +1,9 @@
-import pytest
-import numpy as np
 from langchain.schema import Document as LC_Document
 
 from app.embedding import (
     Document,
-    LangchainOpenAIEmbeddingModel,
     LangchainFAISSVectorStore,
-    EmbeddingStoreManager
+    EmbeddingStoreManager,
 )
 
 
@@ -15,7 +12,8 @@ class FakeEmbeddingModel:
     """
     FakeEmbeddingModel은 실제 OpenAI API 호출 대신,
     텍스트 길이에 따라 고정 차원(1536)의 임베딩 벡터를 반환합니다.
-    이 클래스는 LangchainOpenAIEmbeddingModel과 동일한 인터페이스(get_embedding, embed_query, vector_dim, embeddings)를 구현하며,
+    이 클래스는 LangchainOpenAIEmbeddingModel과 동일한 인터페이스
+    (get_embedding, embed_query, vector_dim, embeddings)를 구현하며,
     __call__ 메서드를 추가하여 인스턴스 자체가 callable하도록 합니다.
     """
 
@@ -81,7 +79,9 @@ def test_embedding_store_manager():
     docs = [
         Document("Content of document one", {"source": "https://example.com"}),
         Document("Content of document two", {"source": "https://example.org"}),
-        Document("Another document from example.com", {"source": "https://example.com"})
+        Document(
+            "Another document from example.com", {"source": "https://example.com"}
+        ),
     ]
     manager.embed_and_store(docs)
     results = manager.search_chunks("document", k=2)
@@ -100,7 +100,7 @@ def test_embedding_pipeline_integration():
     docs = [
         Document("Document one content. " * 10, {"source": "https://example.com"}),
         Document("Document two content. " * 15, {"source": "https://example.org"}),
-        Document("Document three content. " * 8, {"source": "https://example.com"})
+        Document("Document three content. " * 8, {"source": "https://example.com"}),
     ]
     manager.embed_and_store(docs)
     results = manager.search_chunks("content", k=3)

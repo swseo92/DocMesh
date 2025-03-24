@@ -1,6 +1,6 @@
-import pytest
 from unittest.mock import patch, Mock
 from app.crawler import WebCrawler
+
 
 @patch("app.crawler.requests.get")
 def test_webcrawler_cross_domain_links(mock_get):

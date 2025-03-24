@@ -1,10 +1,3 @@
-import sys
-import os
-
-# 현재 디렉토리를 기준으로 상위 디렉토리를 모듈 검색 경로에 추가
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import pytest
 from unittest.mock import patch, Mock
 from app.crawler import PageFetcher, LinkExtractor, LinkQueueManager, WebCrawler
 
@@ -26,6 +19,7 @@ sample_html_2 = """
 </html>
 """
 
+
 # -------- PageFetcher --------
 @patch("app.crawler.requests.get")
 def test_page_fetcher_success(mock_get):
@@ -40,11 +34,13 @@ def test_page_fetcher_success(mock_get):
     assert html == "Mocked content"
     assert content_type.lower() == "text/html"
 
+
 @patch("app.crawler.requests.get", side_effect=Exception("Timeout"))
 def test_page_fetcher_failure(mock_get):
     fetcher = PageFetcher()
     result = fetcher.fetch("https://example.com")
     assert result is None
+
 
 # -------- LinkExtractor --------
 def test_link_extractor_same_domain():
@@ -53,11 +49,13 @@ def test_link_extractor_same_domain():
     links = extractor.extract_links(sample_html, base_url)
     assert "https://example.com/page2" in links
 
+
 def test_link_extractor_cross_domain_filtered():
     html = '<a href="https://othersite.com/page">Other</a>'
     extractor = LinkExtractor()
     links = extractor.extract_links(html, "https://example.com")
     assert links == []  # 필터링됨
+
 
 # -------- LinkQueueManager --------
 def test_link_queue_manager():
@@ -71,6 +69,7 @@ def test_link_queue_manager():
     assert q.has_next()
     next_url = q.next()
     assert next_url == "https://example.com/page2"
+
 
 # -------- WebCrawler (통합 테스트) --------
 @patch("app.crawler.requests.get")

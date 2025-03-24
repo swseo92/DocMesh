@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, Mock
 from app.crawler import WebCrawler
 
@@ -30,11 +29,26 @@ def test_webcrawler_non_html(mock_get):
 
     # 각 URL에 대해 반환할 데이터 매핑
     response_map = {
-        "https://example.com": {"status_code": 200, "text": start_html, "content_type": "text/html"},
-        "https://example.com/pdf": {"status_code": 200, "text": pdf_content.decode("utf-8", errors="ignore"),
-                                    "content_type": "application/pdf"},
-        "https://example.com/empty": {"status_code": 200, "text": empty_html, "content_type": "text/html"},
-        "https://example.com/normal": {"status_code": 200, "text": normal_html, "content_type": "text/html"},
+        "https://example.com": {
+            "status_code": 200,
+            "text": start_html,
+            "content_type": "text/html",
+        },
+        "https://example.com/pdf": {
+            "status_code": 200,
+            "text": pdf_content.decode("utf-8", errors="ignore"),
+            "content_type": "application/pdf",
+        },
+        "https://example.com/empty": {
+            "status_code": 200,
+            "text": empty_html,
+            "content_type": "text/html",
+        },
+        "https://example.com/normal": {
+            "status_code": 200,
+            "text": normal_html,
+            "content_type": "text/html",
+        },
     }
 
     def side_effect(url, timeout=5):
