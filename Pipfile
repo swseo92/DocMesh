@@ -1,0 +1,26 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = "*"
+pytest = "*"
+httpx = "*"
+pydantic = "*"
+requests = "*"
+bs4 = "*"
+langchain = "*"
+langchain-community = "*"
+langchain-text-splitters = "*"
+tiktoken = "*"
+faiss-cpu = "*"
+openai = "*"
+langchain-openapi = "*"
+langchain-openai = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.11"

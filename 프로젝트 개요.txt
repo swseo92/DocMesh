@@ -1,0 +1,374 @@
+1. 개요
+본 프로젝트의 목표는 문서 기반 QA 챗봇에 아래 기능들을 결합한 통합 시스템을 구축하는 것입니다.
+
+링크 입력: 사용자가 특정 웹 문서의 최상위 링크를 입력하면, 자동으로 크롤링.
+
+하위 링크 문서 포함: 시작 링크의 하위 도메인 페이지 전체를 BFS/DFS로 순회하며 텍스트를 수집.
+
+문서 버전 추적: 기존 문서와의 변경 여부(해시 비교)를 통해 버전을 관리하고, 변경사항 발생 시 알림.
+
+벡터 DB 기반 검색: 텍스트를 임베딩(Embeddings)하여 벡터 스토어(FAISS, Milvus, Pinecone 등)에 저장.
+
+QA 챗봇: LLM(GPT-3.5/4 등)을 이용해 사용자가 질문하면, 벡터 검색 결과를 참고하여 최신 문서 기반 답변 제공.
+
+이 프로젝트는 각 기능을 모듈화하여, 멀티 에이전트(MAS) 개념으로 구현할 수 있게 설계되었습니다.
+
+2. 아키텍처 개요
+java
+복사
+편집
+┌─────────────────────────────────────────────────────────┐
+│                      사용자(UI)                       │
+│  1) 링크 입력 / 문서 업데이트 요청 / 질문 & 답변       │
+└─────────────────────────────────────────────────────────┘
+                 │
+                 │ (링크/질문)
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│             Orchestrator Agent (메인)                  │
+│  - 사용자로부터의 요청을 받아,                       │
+│    크롤러/버전관리/임베딩/알림/QA 등을 호출 및 제어     │
+└─────────────────────────────────────────────────────────┘
+                 │
+     ┌───────────┴───────────────────────────┐
+     │                                       │
+     ▼                                       ▼
+┌────────────────────────────────────┐    ┌────────────────────────────────────┐
+│  Crawler Agent                    │    │ Version Manager Agent              │
+│ - 하위 링크까지 BFS/DFS 크롤링     │    │ - 문서 해시 기반 버전 추적         │
+│ - HTML→텍스트 변환 & 전처리        │    │ - 변경사항 감지 & 알림 처리        │
+│ - 결과 Chunk 전달                 │    │                                    │
+└────────────────────────────────────┘    └────────────────────────────────────┘
+                 │(chunk)                     │(버전 결과)
+                 ▼                            ▼
+┌─────────────────────────────────────────────────────────┐
+│  Embedding & VectorStore Manager Agent                 │
+│ - chunk 임베딩 후 벡터 DB에 저장/갱신                   │
+│ - 메타데이터(버전, URL 등) 관리                        │
+└─────────────────────────────────────────────────────────┘
+                 │
+                 │(업데이트 완료)
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│     Notification Agent (옵션)                          │
+│  - 문서 변경 발생 시 Slack/Email/API 알림               │
+└─────────────────────────────────────────────────────────┘
+                 │
+                 │(사용자 질문)
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│  QA Agent (LLM)                                        │
+│ - 사용자 질문 → Embedding → Vector DB에서 상위 chunk   │
+│ - LLM prompt로 전달하여 최종 답변 생성                 │
+└─────────────────────────────────────────────────────────┘
+3. 주요 기능별 상세 설계
+3.1. 사용자 UI
+개요
+
+사용자는 웹 페이지(혹은 CLI/모바일) 인터페이스로 시스템과 상호작용한다.
+
+주요 기능:
+
+(A) 문서 링크 제출: 크롤링 및 임베딩 시작
+
+(B) 문서 버전 관리 보기: 최신 문서/버전 목록, 변경 이력
+
+(C) QA: “이 문서에서 X 기능은 어떻게 사용하나요?” 등 질문
+
+엔드포인트/라우팅 예시
+
+POST /api/crawl: { "url": "<문서링크>" }
+
+GET /api/versions: 버전 관리 정보 조회
+
+POST /api/ask: { "question": "..." } → 챗봇 답변
+
+UX 포인트
+
+크롤링 진행도 표시(“10/30 페이지 크롤링 중...”)
+
+버전 변경 시점 표시(“버전 2023-09-18, 3개 섹션 변경됨”)
+
+3.2. Orchestrator Agent
+역할
+
+시스템의 메타 레벨 조정자.
+
+사용자 요청(크롤링, QA 등)을 받아 관련 에이전트에게 메시지/명령을 전달.
+
+크롤링 완료 후, Version Manager → Embedding Manager → 알림 순서로 태스크를 조율.
+
+구현 방식
+
+간단히는 파이썬 서버(Flask/FastAPI) + 내부 함수로 each Agent를 호출해도 되고,
+
+규모가 크다면 메시지 큐(RabbitMQ, Celery) 등을 통해 비동기 분산 처리.
+
+3.3. Crawler Agent
+기능
+
+(A) 링크(URL)로부터 HTML 가져오기
+
+(B) 하위 링크(BFS/DFS)로 확장 (같은 도메인/URL 패턴만 수집)
+
+(C) HTML → 텍스트 추출(BeautifulSoup, Scrapy 등)
+
+(D) Chunk 분할(예: 문단당 400~1000 단어/토큰)
+
+(E) Orchestrator(또는 Version Manager)에 “(url, chunk_text)” 목록 전달
+
+주요 고려사항
+
+중복/무한 루프 방지: visited set, domain check
+
+오류 페이지(404, 500) 처리
+
+Max Depth, Max Pages 제한
+
+예상 Output (데이터 구조 예시)
+
+json
+복사
+편집
+[
+  {
+    "url": "https://docs.example.com/page1",
+    "content": "This is the text of chunk #1 ...",
+    "seq": 0
+  },
+  {
+    "url": "https://docs.example.com/page1",
+    "content": "This is the text of chunk #2 ...",
+    "seq": 1
+  },
+  ...
+]
+3.4. Version Manager Agent
+목적
+
+문서가 새로 들어올 때, 기존과의 변경 여부를 판단하고 버전을 생성.
+
+구버전 기록을 유지할지, 덮어쓸지 정책 결정.
+
+프로세스
+
+각 chunk 텍스트에 대해 hash = sha256(content) 계산
+
+DB/메모리에서 이전 hash 목록과 비교
+
+달라졌으면 → 새 version_id를 생성 & 기록
+
+변경된 chunk만 Embedding Manager에 전달
+
+변경 사실을 Notification Agent에 통보
+
+DB 스키마 예시
+
+Document: document_id, root_url, latest_version_id, ...
+
+DocumentVersion: version_id, document_id, hash, created_at, content, ...
+
+(벡터 DB와는 별도로, RDB나 NoSQL에서 버전 메타데이터 관리)
+
+3.5. Embedding & VectorStore Manager
+역할
+
+전달받은 chunk 텍스트를 임베딩(Embedding)하고, 벡터 DB에 저장(Upsert)
+
+메타데이터(버전, URL, seq, hash 등) 함께 인덱스
+
+벡터 DB 후보
+
+FAISS: 로컬 파일 인덱스, 작은 프로젝트에 편리
+
+Pinecone, Milvus, Weaviate: 클라우드/분산 환경에서 확장성 보장
+
+임베딩 모델
+
+text-embedding-ada-002 (OpenAI)
+
+sentence-transformers (Hugging Face)
+
+결과:
+
+json
+복사
+편집
+{
+  "embedding": [0.123, -0.045, ...],
+  "metadata": {
+    "url": "...",
+    "version_id": "...",
+    "chunk_seq": 0,
+    ...
+  }
+}
+3.6. Notification Agent (옵션)
+기능
+
+문서가 변경되었을 때, Slack/Email/Webhook 등으로 담당자에게 알림
+
+“문서 X의 3개 섹션이 수정됨. 링크: ...” 등의 메시지
+
+연동 예시
+
+Slack API or Incoming Webhook → POST JSON payload
+
+Email → SMTP 라이브러리
+
+Webhook → 특정 URL로 POST
+
+3.7. QA Agent (LLM)
+개요
+
+사용자의 질문을 받아, 벡터 DB 검색 후, LLM에 전달 → 답변 생성
+
+Retrieval Augmented Generation(RAG) 패턴 활용
+
+동작 단계
+
+사용자 질문 → 임베딩(같은 모델로)
+
+벡터 DB에서 유사도 Top N chunk 검색(메타데이터로 최신 버전만)
+
+검색된 chunk를 하나의 prompt context로 합침
+
+LLM(GPT-3.5/4 등)에 “사용 가능한 문서: ... 질문: ...” 형태로 전달
+
+LLM이 최종 답변 텍스트 생성
+
+QA Agent가 사용자에게 반환 (질문→답변)
+
+LangChain 등 라이브러리
+
+RetrievalQA or ConversationalRetrievalChain
+
+직접 구현 시: OpenAI API + “prompt: context + question”
+
+4. 주요 시나리오
+시나리오 A: 문서 초기 등록
+사용자가 /crawl 엔드포인트에 { "url": "https://docs.example.com" } POST
+
+Orchestrator → Crawler Agent 호출, BFS/DFS 크롤링, chunk 생성
+
+Crawler Agent → Version Manager에 chunk 리스트 전달
+
+Version Manager → 이전 기록 없으므로 모두 새 버전 등록
+
+Embedding & VectorStore Manager → 임베딩 & DB 저장
+
+Notification Agent(선택) → “새 문서 등록 완료” 알림
+
+시나리오 B: 문서 업데이트
+배치/스케줄러(또는 수동) → 같은 URL 재크롤
+
+Crawler 결과 → Version Manager가 해시 비교 → 변경 chunk 식별 → 새 버전 부여
+
+Embedding Manager → 변경 chunk 재임베딩, 벡터 DB upsert
+
+Notification Agent → “버전 업데이트됨” 알림
+
+시나리오 C: QA
+사용자가 /ask로 {"question": "HTTP 요청을 어떻게 보내나요?"}
+
+QA Agent
+
+질문 임베딩 → 벡터 DB 검색 (Top N chunk)
+
+chunk + question → LLM Prompt 구성
+
+LLM API 호출 → 답변
+
+응답 반환
+
+5. 기술 스택 및 설정
+프로그래밍 언어: Python 3.x
+
+웹 프레임워크: FastAPI / Flask (Orchestrator 역할)
+
+HTML 파싱: requests, BeautifulSoup(또는 Scrapy)
+
+임베딩 모델: OpenAI text-embedding-ada-002 or Hugging Face sentence-transformers
+
+벡터 DB:
+
+개발·테스트: FAISS (in-memory or local file)
+
+프로덕션 확장: Pinecone / Milvus / Weaviate
+
+LLM:
+
+OpenAI GPT-3.5/4 API
+
+(옵션) Local LLM (LLaMA2, Falcon 등) + GPU 환경
+
+데이터베이스(버전메타):
+
+PostgreSQL / MySQL / MongoDB 등 (문서 버전, hash, etc.)
+
+6. 운영 & 배포
+컨테이너화
+
+각 에이전트를 Python 모듈로 구현 후, Docker로 배포.
+
+Orchestrator 컨테이너, Worker(Agent) 컨테이너, Vector DB 컨테이너, RDB 컨테이너 등 구성.
+
+Kubernetes 등에서 스케일링 가능.
+
+메시지 큐(옵션)
+
+Crawler, Embedding, Notification 등 비동기 작업이 많으면 RabbitMQ/Celery/SQS를 도입, 작업 큐 구조로 확장.
+
+보안/인증
+
+내부 문서라면 크롤링 시 로그인 쿠키 필요 → Crawler에 인증 로직 추가.
+
+LLM API Key(OpenAI) / Embedding Key 등 민감정보는 Vault나 안전한 방식으로 관리.
+
+로그 & 모니터링
+
+크롤링 상태, DB 업데이트, QA 질의량 등을 Prometheus + Grafana 혹은 ELK(Elastic/Kibana)로 확인.
+
+변경이 과도할 경우 알람 설정.
+
+7. 확장 아이디어
+문서 Diff 시각화
+
+변경된 텍스트 부분을 하이라이트하여 관리자에게 제공.
+
+“버전 A vs 버전 B” 블록 비교.
+
+Conversation Memory
+
+QA가 대화형 컨텍스트를 유지(“아까 말한 함수 옵션은?”) → ConversationalRetrievalChain 등 적용.
+
+멀티도메인
+
+여러 웹사이트(외부/내부) 동시 관리.
+
+Document별로 권한 설정(“사내 비공개 문서” vs “공개 문서”).
+
+Fine-tuning / LoRA
+
+특정 문서에 특화된 LLM 미세조정 → QA 정확도 향상.
+
+비용, 데이터 품질 고려 필요.
+
+Plugins / Integration
+
+Notion, Google Drive, Confluence 등 SaaS 문서와 직접 연동해 문서 자동 업데이트.
+
+8. 결론
+이 시스템은 크롤링→버전관리→벡터DB→LLM QA를 멀티 에이전트로 나누어 협업하도록 설계하였으며:
+
+Crawler Agent: 웹 문서 수집 & 전처리
+
+Version Manager: 문서 변경 감지 & 버전 추적
+
+Embedding Manager: Chunk 임베딩 & 벡터 DB 저장
+
+Notification Agent: 변경사항 알림
+
+QA Agent: 사용자 질문에 대한 LLM 기반 응답
+
+Orchestrator Agent: 전체 프로세스 조율
