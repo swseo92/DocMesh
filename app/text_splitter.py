@@ -138,8 +138,7 @@ class DocumentChunkPipeline:
         return final_docs
 
 
-# ----------------------- 테스트 코드 -----------------------
-if __name__ == "__main__":
+def main():
     # 모의 크롤러 결과: 이미 HTML의 문단을 고려해 분할된 상태
     crawler_results = [
         {
@@ -188,3 +187,7 @@ if __name__ == "__main__":
             else:
                 print("  → Overlap 미적용!")
         print("Excerpt:", doc["text"][:200], "\n")
+
+
+if __name__ == "__main__":
+    main()

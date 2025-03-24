@@ -1,9 +1,13 @@
-from app.text_splitter import DocumentChunkPipeline, default_tokenizer
+from app.text_splitter import DocumentChunkPipeline, default_tokenizer, main
 
 
 def generate_text(token_count: int, token: str = "word") -> str:
     """간단하게 지정한 토큰(token)을 공백으로 구분하여 token_count 만큼 생성."""
     return " ".join([token] * token_count)
+
+
+def test_main():
+    main()
 
 
 def test_merge_chunks():

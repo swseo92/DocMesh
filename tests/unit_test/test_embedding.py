@@ -4,7 +4,12 @@ from app.embedding import (
     Document,
     LangchainFAISSVectorStore,
     EmbeddingStoreManager,
+    main,
 )
+
+
+def test_main():
+    main()
 
 
 # --- FakeEmbeddingModel 수정 ---

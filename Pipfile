@@ -20,6 +20,7 @@ openai = "*"
 langchain-openapi = "*"
 langchain-openai = "*"
 pre-commit = "*"
+coverage = "*"
 
 [dev-packages]
 

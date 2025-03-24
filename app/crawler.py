@@ -153,11 +153,15 @@ class WebCrawler:
         return self.collected
 
 
-# 사용 예시
-if __name__ == "__main__":
+def main():
     crawler = WebCrawler("https://example.com", use_max_pages=False)
     results = crawler.crawl()
     for result in results:
         print(
             f"\n[Source] {result['source']}\nText excerpt: {result['text'][:200]}...\n"
         )
+
+
+# 사용 예시
+if __name__ == "__main__":
+    main()

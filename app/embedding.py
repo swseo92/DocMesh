@@ -90,8 +90,7 @@ class EmbeddingStoreManager:
         return self.vector_store.search(query, k=k)
 
 
-# --- 사용 예시 ---
-if __name__ == "__main__":
+def main():
     # 테스트용 Document 객체들 생성
     docs = [
         Document(
@@ -122,3 +121,7 @@ if __name__ == "__main__":
     for res in results:
         print(f"Source: {res.metadata.get('source', '')}")
         print(f"Content: {res.page_content}\n")
+
+
+if __name__ == "__main__":
+    main()
