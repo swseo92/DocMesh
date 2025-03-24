@@ -19,6 +19,7 @@ faiss-cpu = "*"
 openai = "*"
 langchain-openapi = "*"
 langchain-openai = "*"
+pre-commit = "*"
 
 [dev-packages]
 
