@@ -6,6 +6,7 @@ from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document as LC_Document
 from dotenv import load_dotenv
+import abc
 
 # .env 파일에서 OPENAI_API_KEY를 로드합니다.
 load_dotenv()
@@ -25,34 +26,67 @@ class Document:
         return LC_Document(page_content=self.page_content, metadata=self.metadata)
 
 
-# --- Embedding Model 구현 ---
-class LangchainOpenAIEmbeddingModel:
+# --- Embedding Model 추상 클래스 및 구현 ---
+class BaseEmbeddingModel(abc.ABC):
+    @abc.abstractmethod
+    def get_embedding(self, text: str) -> list:
+        """주어진 텍스트의 임베딩 벡터를 반환합니다."""
+        pass
+
+    @property
+    @abc.abstractmethod
+    def vector_dim(self) -> int:
+        """임베딩 벡터의 차원을 반환합니다."""
+        pass
+
+
+class LangchainOpenAIEmbeddingModel(BaseEmbeddingModel):
     """
     LangchainOpenAIEmbeddingModel은 LangChain의 OpenAIEmbeddings를 사용하여 텍스트를 임베딩합니다.
+    model_name 인자를 통해 다양한 OpenAI 임베딩 모델(e.g., text-embedding-ada-002, text-embedding-babbage-001 등)을 선택할 수 있습니다.
     """
 
     def __init__(self, model_name: str = "text-embedding-ada-002"):
+        self._model_name = model_name
         self.embeddings = OpenAIEmbeddings(model=model_name)
-        # "hello world"에 대한 임베딩 결과를 통해 임베딩 차원을 동적으로 결정합니다.
-        self.vector_dim = len(self.embeddings.embed_query("hello world"))
+        # "hello world" 임베딩을 통해 임베딩 차원을 결정합니다.
+        self._vector_dim = len(self.embeddings.embed_query("hello world"))
 
     def get_embedding(self, text: str) -> list:
         return self.embeddings.embed_query(text)
+
+    @property
+    def vector_dim(self) -> int:
+        return self._vector_dim
+
+
+def create_embedding_model(
+    provider: str = "openai", model_name: str = "text-embedding-ada-002"
+) -> BaseEmbeddingModel:
+    """
+    provider와 model_name에 따라 적절한 임베딩 모델 인스턴스를 생성합니다.
+    현재는 provider가 "openai"일 경우 LangchainOpenAIEmbeddingModel을 반환하며,
+    향후 다른 공급자를 위한 구현체를 추가할 수 있습니다.
+    """
+    if provider == "openai":
+        return LangchainOpenAIEmbeddingModel(model_name=model_name)
+    else:
+        raise ValueError(f"Unsupported embedding model provider: {provider}")
 
 
 # --- Vector Store 구현 ---
 class LangchainFAISSVectorStore:
     """
-    LangchainFAISSVectorStore는 공식 문서 예제와 같이,
-    FAISS 인덱스, InMemoryDocstore, 그리고 빈 index_to_docstore_id 딕셔너리를 이용해 벡터 스토어를 초기화합니다.
+    LangchainFAISSVectorStore는 FAISS 인덱스, InMemoryDocstore, 빈 index_to_docstore_id 딕셔너리를 이용해
+    벡터 스토어를 초기화하고, 임베딩 모델의 get_embedding()을 사용해 문서 임베딩 및 유사도 검색을 수행합니다.
     """
 
-    def __init__(self, embedding_model: LangchainOpenAIEmbeddingModel):
+    def __init__(self, embedding_model: BaseEmbeddingModel):
         self.embedding_model = embedding_model
         # 임베딩 차원에 맞게 FAISS 인덱스 생성
         index = faiss.IndexFlatL2(self.embedding_model.vector_dim)
         self.vectorstore = FAISS(
-            embedding_function=self.embedding_model.embeddings,
+            embedding_function=lambda text: self.embedding_model.get_embedding(text),
             index=index,
             docstore=InMemoryDocstore(),
             index_to_docstore_id={},
@@ -77,7 +111,7 @@ class EmbeddingStoreManager:
 
     def __init__(
         self,
-        embedding_model: LangchainOpenAIEmbeddingModel,
+        embedding_model: BaseEmbeddingModel,
         vector_store: LangchainFAISSVectorStore,
     ):
         self.embedding_model = embedding_model
@@ -103,11 +137,11 @@ def main():
         ),
     ]
 
-    # LangChain 기반 임베딩 모델과 FAISS 벡터스토어 생성
-    embedding_model = LangchainOpenAIEmbeddingModel()
+    # create_embedding_model() 팩토리 함수를 통해 임베딩 모델 생성
+    embedding_model = create_embedding_model(
+        provider="openai", model_name="text-embedding-ada-002"
+    )
     vector_store = LangchainFAISSVectorStore(embedding_model)
-
-    # EmbeddingStoreManager를 생성하여 두 객체를 결합
     manager = EmbeddingStoreManager(embedding_model, vector_store)
 
     # Document 임베딩 및 저장
