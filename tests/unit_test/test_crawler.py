@@ -1,5 +1,5 @@
 from unittest.mock import patch, Mock
-from app.crawler import (
+from docmesh.crawler import (
     PageFetcher,
     LinkExtractor,
     LinkQueueManager,
@@ -32,7 +32,7 @@ def test_main():
 
 
 # -------- PageFetcher --------
-@patch("app.crawler.requests.get")
+@patch("docmesh.crawler.requests.get")
 def test_page_fetcher_success(mock_get):
     mock_response = Mock(status_code=200, text="Mocked content")
     mock_response.headers = {"Content-Type": "text/html"}
@@ -46,7 +46,7 @@ def test_page_fetcher_success(mock_get):
     assert content_type.lower() == "text/html"
 
 
-@patch("app.crawler.requests.get", side_effect=Exception("Timeout"))
+@patch("docmesh.crawler.requests.get", side_effect=Exception("Timeout"))
 def test_page_fetcher_failure(mock_get):
     fetcher = PageFetcher()
     result = fetcher.fetch("https://example.com")
@@ -83,7 +83,7 @@ def test_link_queue_manager():
 
 
 # -------- WebCrawler (통합 테스트) --------
-@patch("app.crawler.requests.get")
+@patch("docmesh.crawler.requests.get")
 def test_webcrawler_crawl(mock_get):
     # 두 페이지 순서로 mock
     def side_effect(url, timeout):
@@ -129,7 +129,7 @@ def test_html_content_loader_else_branch(monkeypatch):
 
     # monkeypatch: HTMLHeaderTextSplitter.split_text를 fake_split_text로 대체
     monkeypatch.setattr(
-        "app.crawler.HTMLHeaderTextSplitter.split_text", fake_split_text
+        "docmesh.crawler.HTMLHeaderTextSplitter.split_text", fake_split_text
     )
 
     loader = HTMLContentLoader(test_url, test_html)

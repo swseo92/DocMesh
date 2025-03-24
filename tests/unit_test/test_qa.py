@@ -1,7 +1,7 @@
 import os
 import pytest
-from app.qa_bot import QAService, LLMServiceFactory
-from app.embedding import (
+from docmesh.qa_bot import QAService, LLMServiceFactory
+from docmesh.embedding import (
     LangchainOpenAIEmbeddingModel,
     LangchainFAISSVectorStore,
     Document,

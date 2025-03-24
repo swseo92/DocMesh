@@ -1,9 +1,9 @@
 from unittest.mock import patch, Mock
-from app.crawler import WebCrawler
+from docmesh.crawler import WebCrawler
 
 
 # ======== CASE 1: a → b → c → a ========
-@patch("app.crawler.requests.get")
+@patch("docmesh.crawler.requests.get")
 def test_cyclic_links_case1(mock_get):
     html_map = {
         "https://example.com/a": '<a href="https://example.com/b">b</a>',
@@ -32,7 +32,7 @@ def test_cyclic_links_case1(mock_get):
 
 
 # ======== CASE 2: a → b → a ========
-@patch("app.crawler.requests.get")
+@patch("docmesh.crawler.requests.get")
 def test_cyclic_links_case2(mock_get):
     html_map = {
         "https://example.com/a": '<a href="https://example.com/b">b</a>',

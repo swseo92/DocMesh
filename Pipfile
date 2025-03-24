@@ -21,6 +21,7 @@ langchain-openapi = "*"
 langchain-openai = "*"
 pre-commit = "*"
 coverage = "*"
+dotenv = "*"
 
 [dev-packages]
 

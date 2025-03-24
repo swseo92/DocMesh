@@ -1,10 +1,10 @@
 from collections import defaultdict
-from app.text_splitter import DocumentChunkPipeline, default_tokenizer
+from docmesh.text_splitter import DocumentChunkPipeline, default_tokenizer
 
 
 def test_crawler_pipeline_integration(monkeypatch):
     # Import WebCrawler from crawler.py and DocumentChunkPipeline from our module.
-    from app.crawler import WebCrawler
+    from docmesh.crawler import WebCrawler
 
     content1 = "This is the first paragraph under heading 1." * 100
     content2 = "This is a paragraph under heading 2." * 100

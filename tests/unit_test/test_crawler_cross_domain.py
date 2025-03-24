@@ -1,8 +1,8 @@
 from unittest.mock import patch, Mock
-from app.crawler import WebCrawler
+from docmesh.crawler import WebCrawler
 
 
-@patch("app.crawler.requests.get")
+@patch("docmesh.crawler.requests.get")
 def test_webcrawler_cross_domain_links(mock_get):
     """
     이 테스트는 예시로, base_url(https://example.com) HTML 내에

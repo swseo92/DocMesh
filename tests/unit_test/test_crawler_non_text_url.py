@@ -1,8 +1,8 @@
 from unittest.mock import patch, Mock
-from app.crawler import WebCrawler
+from docmesh.crawler import WebCrawler
 
 
-@patch("app.crawler.requests.get")
+@patch("docmesh.crawler.requests.get")
 def test_webcrawler_non_html(mock_get):
     # Mock 응답 구성
     start_html = """

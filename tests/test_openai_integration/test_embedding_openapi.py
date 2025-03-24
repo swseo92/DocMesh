@@ -3,7 +3,7 @@ import pytest
 from dotenv import load_dotenv
 
 # embedding.py 모듈에서 필요한 클래스들을 임포트합니다.
-from app.embedding import (
+from docmesh.embedding import (
     Document,
     LangchainOpenAIEmbeddingModel,
     LangchainFAISSVectorStore,

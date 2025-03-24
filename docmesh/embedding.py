@@ -60,18 +60,21 @@ class LangchainOpenAIEmbeddingModel(BaseEmbeddingModel):
         return self._vector_dim
 
 
-def create_embedding_model(
-    provider: str = "openai", model_name: str = "text-embedding-ada-002"
-) -> BaseEmbeddingModel:
-    """
-    provider와 model_name에 따라 적절한 임베딩 모델 인스턴스를 생성합니다.
-    현재는 provider가 "openai"일 경우 LangchainOpenAIEmbeddingModel을 반환하며,
-    향후 다른 공급자를 위한 구현체를 추가할 수 있습니다.
-    """
-    if provider == "openai":
-        return LangchainOpenAIEmbeddingModel(model_name=model_name)
-    else:
-        raise ValueError(f"Unsupported embedding model provider: {provider}")
+# --- Embedding Model Factory ---
+class EmbeddingModelFactory:
+    @staticmethod
+    def create_embedding_model(
+        provider: str = "openai", model_name: str = "text-embedding-ada-002"
+    ) -> BaseEmbeddingModel:
+        """
+        provider와 model_name에 따라 적절한 임베딩 모델 인스턴스를 생성합니다.
+        현재는 provider가 "openai"일 경우 LangchainOpenAIEmbeddingModel을 반환하며,
+        향후 다른 공급자를 위한 구현체를 추가할 수 있습니다.
+        """
+        if provider == "openai":
+            return LangchainOpenAIEmbeddingModel(model_name=model_name)
+        else:
+            raise ValueError(f"Unsupported embedding model provider: {provider}")
 
 
 # --- Vector Store 구현 ---
@@ -93,13 +96,32 @@ class LangchainFAISSVectorStore:
         )
 
     def add_documents(self, documents: list) -> None:
-        # Document 객체들을 LangChain Document 객체로 변환하여 추가
         lc_documents = [doc.to_langchain_document() for doc in documents]
         self.vectorstore.add_documents(lc_documents)
 
     def search(self, query: str, k: int = 3) -> list:
-        # similarity_search()를 통해 유사 문서를 검색
         return self.vectorstore.similarity_search(query, k=k)
+
+
+# --- Vector Store Factory ---
+class VectorStoreFactory:
+    @staticmethod
+    def create_vector_store(
+        provider: str = "faiss", embedding_model: BaseEmbeddingModel = None
+    ):
+        """
+        provider와 embedding_model에 따라 적절한 벡터 스토어 인스턴스를 생성합니다.
+        현재는 provider가 "faiss"일 경우 LangchainFAISSVectorStore를 반환하며,
+        추후 다른 벡터 스토어 구현체(Pinecone, Milvus 등)를 추가할 수 있습니다.
+        """
+        if provider == "faiss":
+            if embedding_model is None:
+                raise ValueError(
+                    "embedding_model must be provided for FAISS vector store."
+                )
+            return LangchainFAISSVectorStore(embedding_model)
+        else:
+            raise ValueError(f"Unsupported vector store provider: {provider}")
 
 
 # --- EmbeddingStoreManager: 두 객체를 결합하는 Manager ---
@@ -137,11 +159,14 @@ def main():
         ),
     ]
 
-    # create_embedding_model() 팩토리 함수를 통해 임베딩 모델 생성
-    embedding_model = create_embedding_model(
+    # EmbeddingModelFactory를 통해 임베딩 모델 생성
+    embedding_model = EmbeddingModelFactory.create_embedding_model(
         provider="openai", model_name="text-embedding-ada-002"
     )
-    vector_store = LangchainFAISSVectorStore(embedding_model)
+    # VectorStoreFactory를 통해 벡터 스토어 생성
+    vector_store = VectorStoreFactory.create_vector_store(
+        provider="faiss", embedding_model=embedding_model
+    )
     manager = EmbeddingStoreManager(embedding_model, vector_store)
 
     # Document 임베딩 및 저장

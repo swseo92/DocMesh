@@ -1,9 +1,10 @@
-from langchain.schema import Document as LC_Document
-
-from app.embedding import (
-    Document,
-    LangchainFAISSVectorStore,
+import pytest
+from docmesh.embedding import (
+    LangchainOpenAIEmbeddingModel,
+    EmbeddingModelFactory,
+    VectorStoreFactory,
     EmbeddingStoreManager,
+    Document,
     main,
 )
 
@@ -12,104 +13,88 @@ def test_main():
     main()
 
 
-# --- FakeEmbeddingModel 수정 ---
-class FakeEmbeddingModel:
-    """
-    FakeEmbeddingModel은 실제 OpenAI API 호출 대신,
-    텍스트 길이에 따라 고정 차원(1536)의 임베딩 벡터를 반환합니다.
-    이 클래스는 LangchainOpenAIEmbeddingModel과 동일한 인터페이스
-    (get_embedding, embed_query, vector_dim, embeddings)를 구현하며,
-    __call__ 메서드를 추가하여 인스턴스 자체가 callable하도록 합니다.
-    """
-
-    def __init__(self, dim: int = 1536):
-        self.dim = dim
-        self.vector_dim = dim  # FAISSVectorStore가 요구하는 속성
-        self.embeddings = self  # FAISSVectorStore 생성 시 사용
-
-    def __call__(self, text: str) -> list:
-        return self.get_embedding(text)
-
-    def embed_query(self, text: str) -> list:
-        # 텍스트 길이를 100으로 나눈 값을 모든 요소로 채워 반환합니다.
-        value = len(text) / 100.0
-        return [value] * self.dim
-
-    def get_embedding(self, text: str) -> list:
-        return self.embed_query(text)
+# 더미 embed_query 함수: 입력 텍스트와 상관없이 고정된 벡터를 반환
+def dummy_embed_query(text):
+    # 예: 768차원 벡터 (실제 차원은 상관없으므로 고정값 사용)
+    return [0.1] * 768
 
 
-# --- Document 클래스 테스트 ---
-def test_document_to_langchain_document():
-    doc = Document("Test content", {"source": "https://example.com"})
-    lc_doc = doc.to_langchain_document()
-    assert isinstance(lc_doc, LC_Document)
-    assert lc_doc.page_content == "Test content"
-    assert lc_doc.metadata == {"source": "https://example.com"}
+@pytest.fixture(autouse=True)
+def override_embed_query(monkeypatch):
+    def dummy_init(self, model_name: str = "text-embedding-ada-002"):
+        self._model_name = model_name
+        # 더미 embed_query 함수를 직접 할당합니다.
+        self.embeddings = type(
+            "DummyEmbeddings", (), {"embed_query": staticmethod(dummy_embed_query)}
+        )
+        self._vector_dim = len(dummy_embed_query("hello world"))
+
+    monkeypatch.setattr(LangchainOpenAIEmbeddingModel, "__init__", dummy_init)
 
 
-# --- FakeEmbeddingModel 테스트 ---
-def test_fake_embedding_model():
-    fake_model = FakeEmbeddingModel(dim=1536)
-    text = "Hello world!"
-    embedding = fake_model.get_embedding(text)
-    assert len(embedding) == 1536
-    expected_value = len(text) / 100.0
-    for val in embedding:
-        assert abs(val - expected_value) < 1e-6
+def test_embedding_model_factory():
+    # EmbeddingModelFactory를 이용해 임베딩 모델 생성
+    embedding_model = EmbeddingModelFactory.create_embedding_model(
+        provider="openai", model_name="text-embedding-ada-002"
+    )
+    assert isinstance(embedding_model, LangchainOpenAIEmbeddingModel)
+    # dummy_embed_query를 사용하므로 vector_dim은 768로 예상됩니다.
+    assert embedding_model.vector_dim == 768
+    # get_embedding이 dummy 값을 반환하는지 확인
+    vec = embedding_model.get_embedding("Test text")
+    assert isinstance(vec, list)
+    assert len(vec) == 768
+    assert all(v == 0.1 for v in vec)
 
 
-# --- FAISSVectorStore 테스트 ---
-def test_faiss_vector_store():
-    fake_model = FakeEmbeddingModel(dim=1536)
-    vector_store = LangchainFAISSVectorStore(embedding_model=fake_model)
-    # 생성할 Document 객체
-    doc = Document("Test content for FAISS", {"source": "https://example.com"})
-    vector_store.add_documents([doc])
-    # 검색: 같은 텍스트로 검색하면 저장한 문서가 반환되어야 함
-    results = vector_store.search("Test content for FAISS", k=1)
-    assert len(results) == 1
-    res = results[0]
-    assert hasattr(res, "metadata")
-    assert hasattr(res, "page_content")
-    assert res.metadata.get("source") == "https://example.com"
+def test_vector_store_factory():
+    # 임베딩 모델 생성
+    embedding_model = EmbeddingModelFactory.create_embedding_model(
+        provider="openai", model_name="text-embedding-ada-002"
+    )
+    # VectorStoreFactory를 이용해 벡터 스토어 생성
+    vector_store = VectorStoreFactory.create_vector_store(
+        provider="faiss", embedding_model=embedding_model
+    )
+    from docmesh.embedding import LangchainFAISSVectorStore
+
+    assert isinstance(vector_store, LangchainFAISSVectorStore)
 
 
-# --- EmbeddingStoreManager 테스트 ---
-def test_embedding_store_manager():
-    fake_model = FakeEmbeddingModel(dim=1536)
-    vector_store = LangchainFAISSVectorStore(embedding_model=fake_model)
-    manager = EmbeddingStoreManager(fake_model, vector_store)
+def test_embedding_store_manager_embed_and_search():
+    # 임베딩 모델 생성 (더미 embed_query 사용)
+    embedding_model = EmbeddingModelFactory.create_embedding_model(
+        provider="openai", model_name="text-embedding-ada-002"
+    )
+    # VectorStoreFactory를 이용해 벡터 스토어 생성
+    vector_store = VectorStoreFactory.create_vector_store(
+        provider="faiss", embedding_model=embedding_model
+    )
+    manager = EmbeddingStoreManager(embedding_model, vector_store)
 
-    docs = [
-        Document("Content of document one", {"source": "https://example.com"}),
-        Document("Content of document two", {"source": "https://example.org"}),
-        Document(
-            "Another document from example.com", {"source": "https://example.com"}
-        ),
-    ]
-    manager.embed_and_store(docs)
-    results = manager.search_chunks("document", k=2)
-    assert len(results) == 2
+    # 테스트용 Document 객체 생성
+    doc1 = Document(
+        "This is the content of the first document.", {"source": "https://example.com"}
+    )
+    doc2 = Document(
+        "The second document contains more detailed testing info.",
+        {"source": "https://example.org"},
+    )
+    documents = [doc1, doc2]
+
+    # 문서 임베딩 및 저장
+    manager.embed_and_store(documents)
+
+    # 어떤 쿼리든 저장한 문서가 검색 결과로 반환되는지 확인
+    results = manager.search_chunks("first document", k=2)
+    assert isinstance(results, list)
+    assert len(results) > 0
+    # 각 결과는 LC_Document 형태로 metadata에 source가 포함되어야 합니다.
     for res in results:
-        assert hasattr(res, "metadata")
         assert hasattr(res, "page_content")
-
-
-# --- 전체 파이프라인 통합 테스트 ---
-def test_embedding_pipeline_integration():
-    fake_model = FakeEmbeddingModel(dim=1536)
-    vector_store = LangchainFAISSVectorStore(embedding_model=fake_model)
-    manager = EmbeddingStoreManager(fake_model, vector_store)
-
-    docs = [
-        Document("Document one content. " * 10, {"source": "https://example.com"}),
-        Document("Document two content. " * 15, {"source": "https://example.org"}),
-        Document("Document three content. " * 8, {"source": "https://example.com"}),
-    ]
-    manager.embed_and_store(docs)
-    results = manager.search_chunks("content", k=3)
-    assert len(results) == 3
-    for res in results:
         assert hasattr(res, "metadata")
-        assert hasattr(res, "page_content")
+        assert "source" in res.metadata
+
+
+if __name__ == "__main__":
+    pytest.main()

@@ -1,4 +1,4 @@
-from app.text_splitter import DocumentChunkPipeline, default_tokenizer, main
+from docmesh.text_splitter import DocumentChunkPipeline, default_tokenizer, main
 
 
 def generate_text(token_count: int, token: str = "word") -> str:

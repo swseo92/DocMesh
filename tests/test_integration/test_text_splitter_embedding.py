@@ -1,6 +1,6 @@
 import pytest
-from app.text_splitter import DocumentChunkPipeline
-from app.embedding import Document, EmbeddingStoreManager, LangchainFAISSVectorStore
+from docmesh.text_splitter import DocumentChunkPipeline
+from docmesh.embedding import Document, EmbeddingStoreManager, LangchainFAISSVectorStore
 
 
 # --- FakeEmbeddingModel 정의 ---
