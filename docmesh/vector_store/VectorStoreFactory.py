@@ -20,7 +20,7 @@ class VectorStoreFactory:
                 raise ValueError(
                     "embedding_model must be provided for FAISS vector store."
                 )
-            return LangchainFAISSVectorStore(embedding_model)
+            return LangchainFAISSVectorStore(embedding_model, **kwargs)
         elif provider == "annoy":
             if embedding_model is None:
                 raise ValueError(

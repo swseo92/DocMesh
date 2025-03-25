@@ -5,16 +5,11 @@ from typing import Optional, List, Tuple, Dict
 from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
+import re
 
 
-# 실제 페이지의 HTML을 가져오는 클래스 (한 번만 호출)
 class PageFetcher:
     def fetch(self, url: str) -> Optional[Tuple[str, str]]:
-        """
-        주어진 URL에서 HTML 콘텐츠를 가져오며,
-        (html, Content-Type)를 튜플로 반환.
-        실패 시 None 반환.
-        """
         try:
             resp = requests.get(url, timeout=5)
             if resp.status_code == 200:
@@ -24,15 +19,10 @@ class PageFetcher:
         return None
 
 
-# HTML에서 하이퍼링크(a href)를 추출하는 클래스
 class LinkExtractor:
     def extract_links(
         self, html: str, base_url: str, same_domain_only: bool = True
     ) -> List[str]:
-        """
-        HTML 내 모든 링크를 추출합니다.
-        same_domain_only=True이면, base_url과 같은 도메인의 링크만 포함.
-        """
         soup = BeautifulSoup(html, "html.parser")
         base_domain = urlparse(base_url).netloc
         links: List[str] = []
@@ -44,7 +34,6 @@ class LinkExtractor:
         return links
 
 
-# 방문한 URL과 방문 예정 URL을 관리하는 큐 클래스
 class LinkQueueManager:
     def __init__(self, start_url: str):
         self._start_url = start_url
@@ -65,14 +54,12 @@ class LinkQueueManager:
                 self.to_visit.append(link)
 
 
-# HTMLContentLoader: HTMLHeaderTextSplitter를 사용해 HTML을 여러 Document(청크)로 분할
 class HTMLContentLoader:
     def __init__(self, url: str, html: str):
         self.url = url
         self.html = html
 
     def load(self) -> List[Document]:
-        # headers_to_split_on에 튜플 형태로 헤더 태그 정보를 전달합니다.
         splitter = HTMLHeaderTextSplitter(
             headers_to_split_on=[
                 ("h1", "h1"),
@@ -85,8 +72,6 @@ class HTMLContentLoader:
         )
         chunks = splitter.split_text(self.html)
         documents = []
-        # splitter가 이미 Document 객체를 반환하는 경우, 메타데이터를 업데이트하고,
-        # 그렇지 않으면 새 Document를 생성합니다.
         for chunk in chunks:
             if isinstance(chunk, Document):
                 chunk.metadata["source"] = self.url
@@ -98,34 +83,35 @@ class HTMLContentLoader:
         return documents
 
 
-# 전체 웹 크롤링 흐름을 조율하는 메인 클래스
 class WebCrawler:
-    def __init__(self, start_url: str, use_max_pages: bool = True, max_pages: int = 5):
+    def __init__(
+        self,
+        start_url: str,
+        use_max_pages: bool = True,
+        max_pages: int = 5,
+        excluded_patterns: Optional[List[str]] = None,  # 정규표현식 패턴 리스트
+    ):
         self.start_url: str = start_url
         self.use_max_pages: bool = use_max_pages
         self.max_pages: int = max_pages
+        # excluded_patterns가 지정되지 않으면 빈 리스트로 초기화합니다.
+        self.excluded_patterns: List[str] = (
+            excluded_patterns if excluded_patterns else []
+        )
         self.fetcher = PageFetcher()
         self.link_extractor = LinkExtractor()
         self.queue = LinkQueueManager(start_url)
-        # 메타데이터를 포함한 청크를 딕셔너리 형태로 저장
         self.collected: List[Dict] = []
 
-    def crawl(self, num_batch=None) -> List[Dict]:
-        """
-        BFS 방식으로 크롤링을 수행합니다.
-        각 URL에 대해 PageFetcher로 HTML을 한 번만 가져와서,
-          - HTMLContentLoader로 Document 객체(텍스트 청크)를 생성하고
-          - 만약 결과가 빈 리스트라면, fallback으로 WebBaseLoader를 이용해 문서를 로드합니다.
-          - LinkExtractor로 하위 링크를 추출합니다.
-        각 청크는 개별적으로 메타데이터와 함께 저장됩니다.
-        """
+        self.list_last_url = []
 
+    def crawl(self, num_batch=None) -> List[Dict]:
+        self.list_last_url = list()
         num_browsed = 0
         self.collected = list()
 
         while self.queue.has_next():
             url = self.queue.next()
-            # print(url)
             num_browsed += 1
 
             fetch_result = self.fetcher.fetch(url)
@@ -136,11 +122,9 @@ class WebCrawler:
             if "text/html" not in content_type.lower():
                 continue
 
-            # HTMLContentLoader를 사용하여 문서 청크 생성
             loader = HTMLContentLoader(url, html)
             docs = loader.load()
 
-            # fallback: HTMLContentLoader 결과가 빈 리스트인 경우, WebBaseLoader 사용
             if not docs:
                 try:
                     fallback_loader = WebBaseLoader(url)
@@ -153,7 +137,6 @@ class WebCrawler:
             if not docs:
                 continue
 
-            # 각 Document(청크)를 개별적으로 저장 (메타데이터 포함)
             for doc in docs:
                 text = doc.page_content.strip()
                 if not text:
@@ -162,14 +145,22 @@ class WebCrawler:
                     {"source": url, "text": text, "metadata": doc.metadata}
                 )
 
-            # 하위 링크 추출 (이미 fetch한 HTML 재사용)
+            # 하위 링크 추출
             links = self.link_extractor.extract_links(html, url)
-            self.queue.add_links(links)
+            # 제외할 URL 패턴을 검사: 각 링크에 대해, excluded_patterns의 정규표현식과 일치하면 제외
+            filtered_links = [
+                link
+                for link in links
+                if not any(
+                    re.search(pattern, link) for pattern in self.excluded_patterns
+                )
+            ]
+            self.queue.add_links(filtered_links)
+            self.list_last_url.append(url)
 
             if self.use_max_pages and len(self.queue.visited) >= self.max_pages:
                 break
 
-            # URL 기준으로 num_batch가 지정된 경우, 처리한 URL 수(num_browsed)가 num_batch에 도달하면 반환
             if num_batch is not None and num_browsed == num_batch:
                 return self.collected
 
@@ -177,7 +168,11 @@ class WebCrawler:
 
 
 def main():
-    crawler = WebCrawler("https://example.com", use_max_pages=False)
+    # 예: 특정 URL와 그 하위 URL들을 제외 처리
+    excluded = ["https://example.com/exclude"]
+    crawler = WebCrawler(
+        "https://example.com", use_max_pages=False, excluded_urls=excluded
+    )
     results = crawler.crawl()
     for result in results:
         print(
@@ -185,6 +180,5 @@ def main():
         )
 
 
-# 사용 예시
 if __name__ == "__main__":
     main()

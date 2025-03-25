@@ -19,6 +19,9 @@ class LangchainFAISSVectorStore:
             index_to_docstore_id={},
         )
 
+    def set_path(self, path: str):
+        self.path = path
+
     def add_documents(self, documents: list) -> None:
         lc_documents = []
         for doc in documents:

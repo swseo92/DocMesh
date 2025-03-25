@@ -25,6 +25,7 @@ dotenv = "*"
 slack-bolt = "*"
 jupyter = "*"
 annoy = "*"
+matplotlib = "*"
 
 [dev-packages]
 
