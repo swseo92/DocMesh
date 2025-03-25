@@ -1,17 +1,11 @@
-from docmesh.llm import BaseLLMService, LLMServiceFactory
-
-
-def test_main():
-    main()
+from docmesh.llm import BaseLLM
 
 
 # -------------------------------
 # QAService: 질문에 대해 문서 검색 및 답변 생성 (참조 URL 포함)
 # -------------------------------
 class QAService:
-    def __init__(
-        self, llm_service: BaseLLMService, embedding_manager, default_k: int = 3
-    ):
+    def __init__(self, llm_service: BaseLLM, embedding_manager, default_k: int = 3):
         self.llm_service = llm_service
         self.embedding_manager = embedding_manager
         self.default_k = default_k
@@ -50,50 +44,3 @@ class QAService:
         )
         answer = self.llm_service.generate_answer(prompt)
         return answer
-
-
-# -------------------------------
-# main() 함수: 전체 QA 흐름 테스트
-# -------------------------------
-def main():
-    # embedding.py 모듈에서 임베딩 모델, FAISSVectorStore, Document, EmbeddingStoreManager를 가져옵니다.
-    from embedding import (
-        LangchainOpenAIEmbeddingModel,
-        LangchainFAISSVectorStore,
-        Document,
-        EmbeddingStoreManager,
-    )
-
-    embedding_model = LangchainOpenAIEmbeddingModel()
-    vector_store = LangchainFAISSVectorStore(embedding_model)
-    embedding_manager = EmbeddingStoreManager(embedding_model, vector_store)
-
-    # FAISS 벡터 스토어의 index_to_docstore_id를 사용해 문서가 이미 저장되어 있는지 확인합니다.
-    if not vector_store.vectorstore.index_to_docstore_id:
-        docs = [
-            Document(
-                "This is the content of the first document.",
-                {"source": "https://example.com"},
-            ),
-            Document(
-                "The second document contains more detailed information for testing.",
-                {"source": "https://example.org"},
-            ),
-        ]
-        embedding_manager.embed_and_store(docs)
-
-    # 팩토리를 이용해 LLM 서비스를 생성합니다.
-    llm_service = LLMServiceFactory.create_llm_service(
-        provider="langchain", model="gpt-3.5-turbo", temperature=0.0
-    )
-    qa_service = QAService(llm_service, embedding_manager)
-
-    # 테스트 질문
-    question = "What is the content of the first document?"
-    answer = qa_service.answer_question(question)
-    print("Question:", question)
-    print("Answer:", answer)
-
-
-if __name__ == "__main__":
-    main()

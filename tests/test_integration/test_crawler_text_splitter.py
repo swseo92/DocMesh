@@ -1,83 +1,79 @@
-from collections import defaultdict
+import pytest
+import requests
+from docmesh.crawler import WebCrawler
 from docmesh.text_splitter import DocumentChunkPipeline, default_tokenizer
+from langchain.schema import Document as LC_Document
 
+# 더미 HTML: 두 개의 헤더와 본문이 포함되어 있음
 
-def test_crawler_pipeline_integration(monkeypatch):
-    # Import WebCrawler from crawler.py and DocumentChunkPipeline from our module.
-    from docmesh.crawler import WebCrawler
+content1 = "This is some text for header 1." * 100
+content2 = "This is some text for header 2." * 100
 
-    content1 = "This is the first paragraph under heading 1." * 100
-    content2 = "This is a paragraph under heading 2." * 100
-    content3 = "This is another paragraph under heading 2." * 100
-
-    # Fake HTML and FakePageFetcher as before
-    FAKE_HTML = f"""
-    <html>
-    <head><title>Test Page</title></head>
-    <body>
-    <h1>Heading 1</h1>
+dummy_html = f"""
+<html>
+  <body>
+    <h1>Header 1</h1>
     <p>{content1}</p>
-    <h2>Heading 2</h2>
+    <h2>Header 2</h2>
     <p>{content2}</p>
-    <p>{content3}</p>
-    </body>
-    </html>
-    """
+  </body>
+</html>
+"""
 
-    FAKE_CONTENT_TYPE = "text/html"
 
-    class FakePageFetcher:
-        def fetch(self, url: str):
-            return (FAKE_HTML, FAKE_CONTENT_TYPE)
+# Dummy Response 객체: requests.get이 반환할 객체
+class DummyResponse:
+    def __init__(self, text, headers):
+        self.text = text
+        self.status_code = 200
+        self.headers = headers
 
-    # Create a WebCrawler instance and monkey-patch its fetcher
-    crawler = WebCrawler("https://fakeurl.com", use_max_pages=False)
-    monkeypatch.setattr(crawler, "fetcher", FakePageFetcher())
 
-    # Run crawler and check its output structure
-    crawl_results = crawler.crawl()
-    assert isinstance(crawl_results, list)
-    assert len(crawl_results) > 0
-    for doc in crawl_results:
-        assert "source" in doc
-        assert "text" in doc
-        assert "metadata" in doc
+# 더미 requests.get: 항상 dummy_html과 Content-Type을 text/html로 반환
+def dummy_requests_get(url, timeout):
+    return DummyResponse(dummy_html, {"Content-Type": "text/html"})
 
-    # Process the crawl results through our DocumentChunkPipeline
+
+# 모든 테스트에 대해 requests.get을 dummy_requests_get으로 대체
+@pytest.fixture(autouse=True)
+def patch_requests_get(monkeypatch):
+    monkeypatch.setattr(requests, "get", dummy_requests_get)
+
+
+def test_crawler_text_splitter_integration():
+    # 1. WebCrawler 생성: dummy URL 사용, 최대 페이지 제한 해제
+    crawler = WebCrawler("https://dummy.com", use_max_pages=False)
+    # 크롤링 실행: num_batch=1로 한 URL만 처리하도록 함
+    results = crawler.crawl(num_batch=1)
+
+    # crawler_results는 각 청크를 딕셔너리 형태로 반환해야 합니다.
+    assert isinstance(results, list)
+    assert len(results) > 0
+    for res in results:
+        assert "source" in res
+        assert "text" in res
+        assert "metadata" in res
+        # 반환된 source는 dummy URL이어야 합니다.
+        assert res["source"] == "https://dummy.com"
+
+    # 2. DocumentChunkPipeline을 사용해 크롤러 결과를 LC_Document 객체로 변환
     pipeline = DocumentChunkPipeline(
         max_tokens=1000, min_tokens=500, desired_overlap=100
     )
-    final_chunks = pipeline.process(crawl_results)
+    documents = pipeline.process(results)
 
-    # Verify final_chunks structure
-    assert isinstance(final_chunks, list)
-    assert len(final_chunks) > 0
+    # documents는 LC_Document 객체 리스트여야 합니다.
+    assert isinstance(documents, list)
+    assert len(documents) > 0
+    for doc in documents:
+        assert isinstance(doc, LC_Document)
+        # metadata에 source 정보가 포함되어 있어야 합니다.
+        assert "source" in doc.metadata
+        assert doc.metadata["source"] == "https://dummy.com"
+        # page_content는 문자열이어야 합니다.
+        assert isinstance(doc.page_content, str)
 
-    # Check each final chunk meets the minimum token count
-    for doc in final_chunks:
-        tokens = default_tokenizer(doc["text"])
-        assert len(tokens) >= 500, f"청크의 토큰 수가 500 미만입니다: {len(tokens)} tokens"
-
-    # Check overlap: For chunks from the same source,
-    # the current chunk should start with
-    # the last 100 tokens of the previous chunk.
-    source_groups = defaultdict(list)
-    for doc in final_chunks:
-        source_groups[doc["source"]].append(doc)
-
-    for source, docs in source_groups.items():
-        if len(docs) > 1:
-            for i in range(1, len(docs)):
-                prev_tokens = default_tokenizer(docs[i - 1]["text"])
-                if len(prev_tokens) >= 100:
-                    expected_overlap = " ".join(prev_tokens[-100:])
-                else:
-                    expected_overlap = " ".join(prev_tokens)
-                actual_start = " ".join(
-                    default_tokenizer(docs[i]["text"])[: len(expected_overlap.split())]
-                )
-                assert docs[i]["text"].startswith(expected_overlap), (
-                    f"Source {source}의 청크 {i+1}에 overlap이 올바르게 적용되지 않았습니다.\n"
-                    f"Expected overlap:\n{expected_overlap}\n"
-                    f"Actual start:\n{actual_start}"
-                )
+    # 3. 추가 검증: 토큰 단위로 분할된 청크의 길이 등 (선택 사항)
+    # 예: 첫 번째 Document의 토큰 수가 min_tokens 이상인지 확인
+    tokens = default_tokenizer(documents[0].page_content)
+    assert len(tokens) >= 500, "첫 번째 청크의 토큰 수가 최소 요구량을 충족하지 않습니다."

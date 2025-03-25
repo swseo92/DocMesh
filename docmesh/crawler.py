@@ -1,5 +1,6 @@
 from langchain.schema import Document
 from langchain.text_splitter import HTMLHeaderTextSplitter
+from langchain.document_loaders import WebBaseLoader  # fallback 로더 추가
 from typing import Optional, List, Tuple, Dict
 from urllib.parse import urljoin, urlparse
 import requests
@@ -109,16 +110,23 @@ class WebCrawler:
         # 메타데이터를 포함한 청크를 딕셔너리 형태로 저장
         self.collected: List[Dict] = []
 
-    def crawl(self) -> List[Dict]:
+    def crawl(self, num_batch=None) -> List[Dict]:
         """
         BFS 방식으로 크롤링을 수행합니다.
         각 URL에 대해 PageFetcher로 HTML을 한 번만 가져와서,
           - HTMLContentLoader로 Document 객체(텍스트 청크)를 생성하고
+          - 만약 결과가 빈 리스트라면, fallback으로 WebBaseLoader를 이용해 문서를 로드합니다.
           - LinkExtractor로 하위 링크를 추출합니다.
         각 청크는 개별적으로 메타데이터와 함께 저장됩니다.
         """
+
+        num_browsed = 0
+        self.collected = list()
+
         while self.queue.has_next():
             url = self.queue.next()
+            # print(url)
+            num_browsed += 1
 
             fetch_result = self.fetcher.fetch(url)
             if fetch_result is None:
@@ -128,8 +136,19 @@ class WebCrawler:
             if "text/html" not in content_type.lower():
                 continue
 
+            # HTMLContentLoader를 사용하여 문서 청크 생성
             loader = HTMLContentLoader(url, html)
             docs = loader.load()
+
+            # fallback: HTMLContentLoader 결과가 빈 리스트인 경우, WebBaseLoader 사용
+            if not docs:
+                try:
+                    fallback_loader = WebBaseLoader(url)
+                    docs = fallback_loader.load()
+                    print(f"[Fallback] WebBaseLoader 사용: {url}")
+                except Exception as e:
+                    print(f"[Fallback Error] {url}: {e}")
+                    docs = []
 
             if not docs:
                 continue
@@ -149,6 +168,10 @@ class WebCrawler:
 
             if self.use_max_pages and len(self.queue.visited) >= self.max_pages:
                 break
+
+            # URL 기준으로 num_batch가 지정된 경우, 처리한 URL 수(num_browsed)가 num_batch에 도달하면 반환
+            if num_batch is not None and num_browsed == num_batch:
+                return self.collected
 
         return self.collected
 

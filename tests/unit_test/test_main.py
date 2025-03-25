@@ -72,23 +72,5 @@ def test_ask(client):
     assert "Sources:" in data["answer"]
 
 
-# 실제 naver.com URL을 사용하여 크롤러가 정상 동작하는지 확인하는 테스트.
-# 이 테스트는 실제 네트워크 호출을 수행하므로, 속도 및 결과가 다를 수 있습니다.
-@pytest.mark.real_crawl
-def test_crawl_naver(client):
-    payload = {"url": "https://naver.com"}
-    response = client.post("/crawl", json=payload)
-    assert response.status_code == 200
-    json_data = response.json()
-    assert json_data.get("status") == "crawl completed"
-    results = json_data.get("results")
-    assert isinstance(results, list)
-    # 실제 naver.com의 경우 문서 청크가 없을 수도 있으므로, 결과가 빈 리스트일 가능성도 염두에 두어야 합니다.
-    # 여기서는 결과가 list 타입임을 확인합니다.
-    # 추가로, 첫 번째 결과의 "source" 값에 "naver.com"이 포함되는지 간단히 체크합니다.
-    if results:
-        assert "naver.com" in results[0].get("source", "").lower()
-
-
 if __name__ == "__main__":
     pytest.main()

@@ -1,5 +1,6 @@
 from typing import List, Dict
 from langchain.text_splitter import TokenTextSplitter
+from langchain.schema import Document as LC_Document
 
 
 def default_length_function(text: str) -> int:
@@ -128,14 +129,21 @@ class DocumentChunkPipeline:
             )
         return final_docs
 
-    def process(self, docs: List[Dict]) -> List[Dict]:
+    def process(self, docs: List[Dict]) -> List[LC_Document]:
         # 1. 합병
         merged = self.merge_chunks(docs)
         # 2. 분할
         split_docs = self.split_merged_chunks(merged)
         # 3. overlap 적용
-        final_docs = self.apply_overlap(split_docs)
-        return final_docs
+        final_docs_dict = self.apply_overlap(split_docs)
+        # 최종 결과를 LangChain Document 객체로 변환하여 반환합니다.
+        return [
+            LC_Document(
+                page_content=d["text"],
+                metadata={"source": d["source"], **d.get("metadata", {})},
+            )
+            for d in final_docs_dict
+        ]
 
 
 def main():
@@ -166,27 +174,16 @@ def main():
 
     # 파이프라인 파라미터: max_tokens=500, min_tokens=500, desired_overlap=100
     pipeline = DocumentChunkPipeline(
-        max_tokens=500, min_tokens=500, desired_overlap=100
+        max_tokens=1000, min_tokens=500, desired_overlap=100
     )
-    final_chunks = pipeline.process(crawler_results)
+    final_documents = pipeline.process(crawler_results)
 
-    # 결과 검증: 각 최종 청크의 토큰 수와 overlap 적용 여부 출력
-    for idx, doc in enumerate(final_chunks, start=1):
-        tokens = default_tokenizer(doc["text"])
-        print(f"[Chunk {idx}] Source: {doc['source']} - Token count: {len(tokens)}")
-        # 두 번째 청크 이상에서 overlap 적용 여부 확인
-        if idx > 1 and final_chunks[idx - 2]["source"] == doc["source"]:
-            prev_tokens = default_tokenizer(final_chunks[idx - 2]["text"])
-            expected_overlap = (
-                " ".join(prev_tokens[-100:])
-                if len(prev_tokens) >= 100
-                else " ".join(prev_tokens)
-            )
-            if doc["text"].startswith(expected_overlap):
-                print("  → Overlap 적용됨.")
-            else:
-                print("  → Overlap 미적용!")
-        print("Excerpt:", doc["text"][:200], "\n")
+    # 최종 Document 출력: 각 Document 객체의 page_content와 metadata 출력
+    for idx, doc in enumerate(final_documents, start=1):
+        print(f"[Document {idx}]")
+        print("Content:", doc.page_content)
+        print("Metadata:", doc.metadata)
+        print("-" * 40)
 
 
 if __name__ == "__main__":

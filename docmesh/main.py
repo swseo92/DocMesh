@@ -1,11 +1,10 @@
 from fastapi import FastAPI
+from docmesh.crawler import WebCrawler
 from docmesh.models import CrawlRequest, QuestionRequest
-from docmesh.qa_bot import QAService, LLMServiceFactory
-from docmesh.embedding import (
-    EmbeddingModelFactory,
-    VectorStoreFactory,
-    EmbeddingStoreManager,
-)
+from docmesh.qa_bot import QAService
+from docmesh.llm import LLMFactory
+from docmesh.embedding import EmbeddingModelFactory
+from docmesh.vector_store import VectorStoreFactory, EmbeddingStoreManager
 from docmesh.config import Config
 
 app = FastAPI()
@@ -29,7 +28,7 @@ else:
 embedding_manager = EmbeddingStoreManager(embedding_model, vector_store)
 
 # 4. LLM 서비스 생성 (팩토리 사용)
-llm_service = LLMServiceFactory.create_llm_service(
+llm_service = LLMFactory.create_llm_service(
     provider=Config.LLM_PROVIDER,
     model=Config.LLM_MODEL,
     temperature=Config.LLM_TEMPERATURE,
@@ -46,9 +45,6 @@ def health_check():
 
 @app.post("/crawl")
 def crawl_endpoint(payload: CrawlRequest):
-    # 실제 크롤러 모듈(WebCrawler)을 호출합니다.
-    from docmesh.crawler import WebCrawler
-
     crawler = WebCrawler(payload.url, use_max_pages=True, max_pages=5)
     results = crawler.crawl()
     return {"status": "crawl completed", "results": results}
@@ -61,6 +57,13 @@ def ask_endpoint(question: QuestionRequest):
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
+    from dotenv import load_dotenv
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    load_dotenv()
+
+    host = os.getenv("FASTAPI_HOST", "0.0.0.0")
+    port = int(os.getenv("FASTAPI_PORT", 8000))
+
+    uvicorn.run(app, host=host, port=port)

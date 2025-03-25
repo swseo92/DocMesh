@@ -1,20 +1,12 @@
-import os
 import pytest
-from docmesh.qa_bot import QAService, LLMServiceFactory
-from docmesh.embedding import (
-    LangchainOpenAIEmbeddingModel,
-    LangchainFAISSVectorStore,
-    Document,
-    EmbeddingStoreManager,
-)
+from docmesh.qa_bot import QAService
+from docmesh.llm import LLMFactory
+from docmesh.embedding import Document, LangchainOpenAIEmbeddingModel
+from docmesh.vector_store import LangchainFAISSVectorStore, EmbeddingStoreManager
 
 
 @pytest.fixture
 def qa_service():
-    # OPENAI_API_KEY가 설정되어 있지 않으면 통합 테스트를 건너뜁니다.
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY is not set, skipping integration test.")
-
     # 임베딩 모델, 벡터 스토어, EmbeddingStoreManager 초기화
     embedding_model = LangchainOpenAIEmbeddingModel()
     vector_store = LangchainFAISSVectorStore(embedding_model)
@@ -35,7 +27,7 @@ def qa_service():
         embedding_manager.embed_and_store(docs)
 
     # 팩토리를 이용해 LangchainLLMService를 생성합니다.
-    llm_service = LLMServiceFactory.create_llm_service(
+    llm_service = LLMFactory.create_llm_service(
         provider="langchain", model="gpt-3.5-turbo", temperature=0.0
     )
 

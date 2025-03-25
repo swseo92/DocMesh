@@ -22,6 +22,9 @@ langchain-openai = "*"
 pre-commit = "*"
 coverage = "*"
 dotenv = "*"
+slack-bolt = "*"
+jupyter = "*"
+annoy = "*"
 
 [dev-packages]
 
