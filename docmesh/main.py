@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from docmesh.crawler import WebCrawler
+from docmesh.extractor import WebCrawler
 from docmesh.models import CrawlRequest, QuestionRequest
 from docmesh.qa_bot import QAService
 from docmesh.llm import LLMFactory
