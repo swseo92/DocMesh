@@ -1,7 +1,8 @@
 import pytest
+from docmesh.format import Document
 from docmesh.qa_bot import QAService
 from docmesh.llm import LLMFactory
-from docmesh.embedding import Document, LangchainOpenAIEmbeddingModel
+from docmesh.embedding import LangchainOpenAIEmbeddingModel
 from docmesh.vector_store import LangchainFAISSVectorStore, EmbeddingStoreManager
 
 

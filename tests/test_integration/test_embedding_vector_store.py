@@ -1,5 +1,6 @@
 import pytest
-from docmesh.embedding import EmbeddingModelFactory, Document
+from docmesh.format import Document
+from docmesh.embedding import EmbeddingModelFactory
 from docmesh.vector_store import VectorStoreFactory, EmbeddingStoreManager
 
 

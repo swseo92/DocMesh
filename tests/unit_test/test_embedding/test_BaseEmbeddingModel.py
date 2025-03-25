@@ -1,5 +1,6 @@
 import pytest
-from docmesh.embedding.BaseEmbeddingModel import BaseEmbeddingModel, Document
+from docmesh.format import Document
+from docmesh.embedding.BaseEmbeddingModel import BaseEmbeddingModel
 from langchain.schema import Document as LC_Document
 
 

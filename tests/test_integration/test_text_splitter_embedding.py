@@ -1,6 +1,7 @@
 import pytest
+from docmesh.format import Document
 from docmesh.text_splitter import DocumentChunkPipeline
-from docmesh.embedding import Document, EmbeddingModelFactory, BaseEmbeddingModel
+from docmesh.embedding import EmbeddingModelFactory, BaseEmbeddingModel
 from docmesh.vector_store import (
     VectorStoreFactory,
     EmbeddingStoreManager,
