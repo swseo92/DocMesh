@@ -1,11 +1,8 @@
-import os
-import tempfile
 from unittest.mock import patch, MagicMock
 
 from docmesh.extractor.tools import (
     PageFetcher,
     LinkExtractor,
-    HTMLFileStorage,
     LinkQueueManager,
     HTMLContentLoader,
 )
@@ -27,7 +24,7 @@ def test_page_fetcher_success(mock_get):
     fetcher = PageFetcher()
     result = fetcher.fetch("https://example.com")
     assert result is not None
-    html, ctype = result
+    html, ctype, url = result
     assert "<html>" in html
     assert "text/html" in ctype.lower()
 
@@ -82,24 +79,6 @@ def test_link_extractor_all_domains():
     assert len(links) == 2
     assert "http://example.com/foo" in links
     assert "http://another.com/bar" in links
-
-
-# =============================================================================
-# 3. HTMLFileStorage 테스트
-# =============================================================================
-def test_html_file_storage():
-    """URL과 HTML을 저장하고, 생성된 파일 경로를 확인."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(base_dir=tmpdir)
-        url = "https://example.com/test"
-        html = "<html><body>Test HTML</body></html>"
-
-        file_path = storage.save_html(url, html)
-        assert os.path.exists(file_path)
-        # 파일 내용 확인
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert "Test HTML" in content
 
 
 # =============================================================================

@@ -1,4 +1,5 @@
-from docmesh.extractor.tools import PageFetcher, LinkExtractor, HTMLFileStorage
+from docmesh.extractor.tools import PageFetcher, LinkExtractor
+from docmesh.extractor.HTMLFileStorage import HTMLFileStorage
 from typing import List, Dict, Set
 import re
 
@@ -57,12 +58,16 @@ class FileSavingCrawler:
                 print(url)
                 continue
 
-            self.visited.add(url)
             fetch_result = self.fetcher.fetch(url)
             if not fetch_result:
                 continue
 
-            html, content_type = fetch_result
+            html, content_type, final_url = fetch_result
+            if final_url in self.visited:
+                # 리다이렉트로 인한 중복 url 수집 방지
+                continue
+
+            self.visited.add(final_url)
             # HTML이 아닌 경우 무시
             if "text/html" not in content_type.lower():
                 continue

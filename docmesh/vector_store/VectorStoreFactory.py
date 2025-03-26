@@ -1,4 +1,3 @@
-from docmesh.vector_store.AnnoyVectorStore import AnnoyVectorStore
 from docmesh.vector_store.FAISSVectorStore import LangchainFAISSVectorStore
 from docmesh.vector_store.BaseVectorStore import BaseVectorStore
 
@@ -21,15 +20,5 @@ class VectorStoreFactory:
                     "embedding_model must be provided for FAISS vector store."
                 )
             return LangchainFAISSVectorStore(embedding_model, **kwargs)
-        elif provider == "annoy":
-            if embedding_model is None:
-                raise ValueError(
-                    "embedding_model must be provided for Annoy vector store."
-                )
-            n_trees = kwargs.get("n_trees", 10)
-            index_path = kwargs.get("index_path", None)
-            return AnnoyVectorStore(
-                embedding_model, n_trees=n_trees, index_path=index_path
-            )
         else:
             raise ValueError(f"Unsupported vector store provider: {provider}")

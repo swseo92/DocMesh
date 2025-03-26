@@ -1,6 +1,3 @@
-import os
-import hashlib
-from datetime import datetime
 from langchain.schema import Document
 from langchain.text_splitter import HTMLHeaderTextSplitter
 from typing import Optional, List, Tuple
@@ -95,7 +92,8 @@ class PageFetcher:
         try:
             resp = requests.get(url, timeout=5)
             if resp.status_code == 200:
-                return (resp.text, resp.headers.get("Content-Type", ""))
+                final_url = resp.url
+                return (resp.text, resp.headers.get("Content-Type", ""), final_url)
         except Exception as e:
             print(f"[Fetch Error] {url}: {e}")
         return None
@@ -117,37 +115,6 @@ class LinkExtractor:
             url_normalized = normalize_url(full_url)
             links.append(url_normalized)
         return links
-
-
-class HTMLFileStorage:
-    """
-    URL을 해시해서 파일로 저장하는 간단한 스토리지.
-    base_dir: 저장할 폴더 경로 (기본: ./collected_html)
-    """
-
-    def __init__(self, base_dir: str = "./collected_html"):
-        self.base_dir = base_dir
-        os.makedirs(self.base_dir, exist_ok=True)
-
-    def save_html(self, url: str, html: str) -> str:
-        """
-        1) URL 해시
-        2) 날짜시각 + 해시 일부를 조합한 파일명
-        3) base_dir 밑에 .html로 저장
-        4) 결과 파일 경로 리턴
-        """
-        # URL을 SHA256 해싱
-        sha_val = hashlib.sha256(url.encode("utf-8")).hexdigest()
-        short_hash = sha_val[:12]  # 해시 앞부분만 쓰기
-
-        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{date_str}_{short_hash}.html"
-        file_path = os.path.join(self.base_dir, filename)
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(html)
-
-        return file_path
 
 
 class LinkQueueManager:

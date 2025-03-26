@@ -1,8 +1,6 @@
 import os
 import tempfile
 from unittest.mock import patch, MagicMock
-
-from docmesh.extractor.tools import PageFetcher, LinkExtractor, HTMLFileStorage
 from docmesh.extractor.FileSavingCrawler import FileSavingCrawler
 
 
@@ -20,19 +18,12 @@ def test_crawl_single_page_html(mock_get):
     mock_resp.text = "<html><body>Single Page Test</body></html>"
     mock_resp.headers = {"Content-Type": "text/html"}
     mock_get.return_value = mock_resp
-
-    # (2) setup crawler
-    fetcher = PageFetcher()
-    extractor = LinkExtractor()
+    mock_resp.url = "https://example.com"
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(base_dir=tmpdir)
-
         crawler = FileSavingCrawler(
             start_url="https://example.com",
-            fetcher=fetcher,
-            link_extractor=extractor,
-            storage=storage,
+            save_path=tmpdir,
             same_domain_only=True,
             excluded_patterns=[],
             use_max_pages=True,
@@ -70,17 +61,10 @@ def test_crawl_non_html_page(mock_get):
     mock_resp.headers = {"Content-Type": "application/pdf"}
     mock_get.return_value = mock_resp
 
-    fetcher = PageFetcher()
-    extractor = LinkExtractor()
-
     with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(tmpdir)
-
         crawler = FileSavingCrawler(
             start_url="https://example.com/pdf",
-            fetcher=fetcher,
-            link_extractor=extractor,
-            storage=storage,
+            save_path=tmpdir,
             same_domain_only=True,
             excluded_patterns=[],
             use_max_pages=True,
@@ -140,17 +124,10 @@ def test_crawl_bfs_multi_pages(mock_get):
 
     mock_get.side_effect = side_effect
 
-    fetcher = PageFetcher()
-    extractor = LinkExtractor()
-
     with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(tmpdir)
-
         crawler = FileSavingCrawler(
             start_url="https://example.com",
-            fetcher=fetcher,
-            link_extractor=extractor,
-            storage=storage,
+            save_path=tmpdir,
             same_domain_only=True,
             excluded_patterns=[],
             use_max_pages=False,  # 페이지 수 제한 없음
@@ -194,18 +171,11 @@ def test_crawl_excluded_patterns(mock_get):
 
     mock_get.side_effect = side_effect
 
-    fetcher = PageFetcher()
-    extractor = LinkExtractor()
-
     with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(tmpdir)
-
         # logout에 해당하는 링크는 제외
         crawler = FileSavingCrawler(
             start_url="https://example.com",
-            fetcher=fetcher,
-            link_extractor=extractor,
-            storage=storage,
+            save_path=tmpdir,
             same_domain_only=True,
             excluded_patterns=[r"logout"],
             use_max_pages=False,
@@ -247,17 +217,10 @@ def test_crawl_max_pages(mock_get):
 
     mock_get.side_effect = side_effect
 
-    fetcher = PageFetcher()
-    extractor = LinkExtractor()
-
     with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(tmpdir)
-
         crawler = FileSavingCrawler(
             start_url="https://example.com",
-            fetcher=fetcher,
-            link_extractor=extractor,
-            storage=storage,
+            save_path=tmpdir,
             same_domain_only=True,
             excluded_patterns=[],
             use_max_pages=True,
@@ -290,10 +253,13 @@ def test_crawl_cycle(mock_get):
         # URL에 따라 HTML 반환
         if url == "https://example.com/a":
             mock_resp.text = html_a
+            mock_resp.url = "https://example.com/a"
         elif url == "https://example.com/b":
             mock_resp.text = html_b
+            mock_resp.url = "https://example.com/b"
         elif url == "https://example.com/c":
             mock_resp.text = html_c
+            mock_resp.url = "https://example.com/c"
         else:
             # 그 외는 404 처리
             mock_resp.status_code = 404
@@ -301,18 +267,11 @@ def test_crawl_cycle(mock_get):
 
     mock_get.side_effect = side_effect
 
-    fetcher = PageFetcher()
-    extractor = LinkExtractor()
-
     with tempfile.TemporaryDirectory() as tmpdir:
-        storage = HTMLFileStorage(base_dir=tmpdir)
-
         # 시작점 a
         crawler = FileSavingCrawler(
             start_url="https://example.com/a",
-            fetcher=fetcher,
-            link_extractor=extractor,
-            storage=storage,
+            save_path=tmpdir,
             same_domain_only=True,
             excluded_patterns=[],
             use_max_pages=False,  # 페이지 제한 없이 순환 검사

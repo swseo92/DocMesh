@@ -28,6 +28,8 @@ annoy = "*"
 matplotlib = "*"
 ragas = "*"
 langsmith = "*"
+lxml = "*"
+rapidfuzz = "*"
 
 [dev-packages]
 
