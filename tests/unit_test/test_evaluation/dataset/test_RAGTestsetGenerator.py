@@ -2,8 +2,8 @@ from unittest.mock import patch, MagicMock
 
 from docmesh.evaluation.dataset.RAGDatasetGenerator import RAGTestsetGenerator
 
-from docmesh.llm import BaseLLM
-from docmesh.embedding import BaseEmbeddingModel
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.embeddings.embeddings import Embeddings
 from langchain.schema import Document
 
 
@@ -28,9 +28,9 @@ def test_create_testset(mock_load, mock_generate, mock_glob, tmp_path):
     mock_generate.return_value = [{"question": "Q1", "answer": "A1"}]
 
     # 4) RAGTestsetGenerator를 초기화하기 위해 필요한 mock LLM, Embeddings 준비
-    mock_llm = MagicMock(spec=BaseLLM)
+    mock_llm = MagicMock(spec=BaseChatModel)
     mock_llm.llm = MagicMock()
-    mock_embeddings = MagicMock(spec=BaseEmbeddingModel)
+    mock_embeddings = MagicMock(spec=Embeddings)
     mock_embeddings.embeddings = MagicMock()
 
     # 5) 테스트 대상 클래스 인스턴스 생성

@@ -9,17 +9,17 @@ from ragas.testset.persona import Persona
 from langchain.document_loaders import BSHTMLLoader
 from langchain.schema import Document
 
-from docmesh.embedding import BaseEmbeddingModel
-from docmesh.llm import BaseLLM
+from langchain_core.embeddings.embeddings import Embeddings
+from langchain_core.language_models.chat_models import BaseChatModel
 from docmesh.text_split import DocumentChunkSplitter
 
 
 class RAGTestsetGenerator:
     def __init__(
         self,
-        generator_llm: BaseLLM,
-        critic_llm: BaseLLM,
-        generator_embeddings: BaseEmbeddingModel,
+        generator_llm: BaseChatModel,
+        critic_llm: BaseChatModel,
+        generator_embeddings: Embeddings,
         list_persona: List[Persona] = None,
         transforms: list = None,
     ):

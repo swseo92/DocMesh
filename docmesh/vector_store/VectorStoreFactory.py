@@ -5,6 +5,9 @@ from langchain_core.embeddings.embeddings import Embeddings
 
 
 class VectorStoreFactory:
+    def __init__(self):
+        pass
+
     def create_vector_store(
         self, provider: str = "faiss", embedding_model: Embeddings = None, **kwargs
     ):
