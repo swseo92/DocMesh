@@ -62,14 +62,6 @@ class RAGTestsetGenerator:
 def load_personas_from_yaml(yaml_file_path: str) -> List[Persona]:
     """
     주어진 YAML 파일에서 Persona 목록을 파싱해 반환합니다.
-
-    YAML 예시:
-    - name: "Junior Developer"
-      role_description: "A developer who..."
-
-    - name: "Senior Developer"
-      role_description: "A seasoned developer with..."
-
     :param yaml_file_path: YAML 파일 경로
     :return: ragas.testset.persona.Persona 객체들의 리스트
     """
@@ -77,7 +69,7 @@ def load_personas_from_yaml(yaml_file_path: str) -> List[Persona]:
         data = yaml.safe_load(f)  # YAML 내용을 파이썬 객체(보통 list[dict])로 파싱
 
     persona_list = []
-    for item in data:
+    for item in data["evaluation"]["dataset"]["personas"]:
         persona_obj = Persona(
             name=item["name"], role_description=item["role_description"]
         )

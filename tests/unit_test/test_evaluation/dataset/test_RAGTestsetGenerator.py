@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 
-from docmesh.evaluation.dataset.RAGDatasetGenerator import RAGTestsetGenerator
+from docmesh.evaluation.RAGDatasetGenerator import RAGTestsetGenerator
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.embeddings.embeddings import Embeddings
