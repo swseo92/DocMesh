@@ -11,6 +11,7 @@ from langchain.schema import Document
 
 from docmesh.embedding import BaseEmbeddingModel
 from docmesh.llm import BaseLLM
+from docmesh.text_split import DocumentChunkSplitter
 
 
 class RAGTestsetGenerator:
@@ -20,6 +21,7 @@ class RAGTestsetGenerator:
         critic_llm: BaseLLM,
         generator_embeddings: BaseEmbeddingModel,
         list_persona: List[Persona] = None,
+        transforms: list = None,
     ):
         generator_llm = generator_llm.llm
         critic_llm = critic_llm.llm
@@ -29,6 +31,7 @@ class RAGTestsetGenerator:
             generator_llm, critic_llm, generator_embeddings
         )
         self.testset_gen.persona_list = list_persona
+        self.transforms = transforms
 
     def _load_html_documents(self, list_fpath: list[str]) -> List[Document]:
         docs = []
@@ -42,13 +45,20 @@ class RAGTestsetGenerator:
             i += 1
         return docs
 
-    def create_testset(self, list_fpath: list[str], testset_size: int) -> List[Dict]:
+    def create_testset(
+        self, list_fpath: list[str], testset_size: int, transforms: list = None
+    ) -> List[Dict]:
+        if transforms is None:
+            transforms = self.transforms
         # 1) 문서 로딩
         docs = self._load_html_documents(list_fpath)
 
+        splitter = DocumentChunkSplitter(chunk_size=1000, chunk_overlap=100)
+        docs_splitted = splitter.chunkify(docs)
+
         # 2) Ragas TestsetGenerator로부터 Q/A 생성
         testset = self.testset_gen.generate_with_langchain_docs(
-            docs, testset_size=testset_size
+            docs_splitted, testset_size=testset_size, transforms=transforms
         )
         return testset
 
