@@ -5,6 +5,7 @@ from docmesh.config import Config
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+from docmesh.tools.load_config import load_config
 
 
 from dotenv import load_dotenv
@@ -12,15 +13,16 @@ from dotenv import load_dotenv
 
 def test_basic_rag_pipeline():
     load_dotenv()
+    config = load_config("../test_config.yaml")
 
     path_save_faiss = "./faiss_index"
     # EmbeddingModelFactory를 통해 임베딩 모델 생성
     embedding_model = EmbeddingModelFactory().create_embedding_model(
-        provider="openai", model_name="text-embedding-ada-002"
+        **config["embedding_model"]
     )
     # VectorStoreFactory를 통해 벡터 스토어 생성
     vector_store = VectorStoreFactory().create_vector_store(
-        provider="faiss", embedding_model=embedding_model, path=path_save_faiss
+        **config["vector_store"], embedding_model=embedding_model, path=path_save_faiss
     )
     docs = vector_store.similarity_search("qux")
     # 로드가 정상적으로 되었는지 확인

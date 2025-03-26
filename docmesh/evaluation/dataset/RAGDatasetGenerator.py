@@ -23,10 +23,6 @@ class RAGTestsetGenerator:
         list_persona: List[Persona] = None,
         transforms: list = None,
     ):
-        generator_llm = generator_llm.llm
-        critic_llm = critic_llm.llm
-        generator_embeddings = generator_embeddings.embeddings
-
         self.testset_gen = TestsetGenerator.from_langchain(
             generator_llm, critic_llm, generator_embeddings
         )

@@ -1,15 +1,19 @@
 import pytest
 from docmesh.embedding.EmbeddingModelFactory import EmbeddingModelFactory
 from langchain_openai import OpenAIEmbeddings
+from docmesh.tools.load_config import load_config
 
 from dotenv import load_dotenv
+
+path_config = "../../test_config.yaml"
 
 
 def test_create_openai_embedding_model():
     load_dotenv()
+    config = load_config(path_config)
 
     embeddings = EmbeddingModelFactory.create_embedding_model(
-        provider="openai", model_name="text-embedding-ada-002"
+        **config["embedding_model"]
     )
 
     assert isinstance(embeddings, OpenAIEmbeddings)
@@ -17,9 +21,10 @@ def test_create_openai_embedding_model():
 
 def test_embed_query_openai_embedding_model():
     load_dotenv()
+    config = load_config(path_config)
 
     embeddings = EmbeddingModelFactory.create_embedding_model(
-        provider="openai", model_name="text-embedding-ada-002"
+        **config["embedding_model"]
     )
 
     embeddings.embed_query("hello world")

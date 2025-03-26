@@ -8,12 +8,15 @@ from docmesh.text_split.DocumentMerger import DocumentMerger
 from docmesh.text_split.DocumentChunkSplitter import DocumentChunkSplitter
 from docmesh.embedding import EmbeddingModelFactory
 from docmesh.vector_store import VectorStoreFactory
+from docmesh.tools.load_config import load_config
 
 from dotenv import load_dotenv
 
 
 def test_create_and_save_and_load_vector_store():
     load_dotenv()
+
+    config = load_config("../test_config.yaml")
 
     path_dir_test_html = "../../test_data/html"
     list_fpath_test_html = glob.glob(path_dir_test_html + "/*.html")[:2]
@@ -33,12 +36,11 @@ def test_create_and_save_and_load_vector_store():
     doc_splitter = DocumentChunkSplitter(chunk_size=1000, chunk_overlap=100)
     # EmbeddingModelFactory를 통해 임베딩 모델 생성
     embedding_model = EmbeddingModelFactory().create_embedding_model(
-        provider="openai", model_name="text-embedding-ada-002"
+        **config["embedding_model"]
     )
     # VectorStoreFactory를 통해 벡터 스토어 생성
     vector_store = VectorStoreFactory().create_vector_store(
-        provider="faiss",
-        embedding_model=embedding_model,
+        embedding_model=embedding_model, **config["vector_store"]
     )
 
     url, html = html_file_loader.read_html(list_fpath_test_html[0])
@@ -56,7 +58,7 @@ def test_create_and_save_and_load_vector_store():
     assert os.path.exists(path_save_faiss)
 
     vector_store2 = VectorStoreFactory().create_vector_store(
-        provider="faiss", embedding_model=embedding_model, path=path_save_faiss
+        **config["vector_store"], embedding_model=embedding_model, path=path_save_faiss
     )
 
     # 로드한 vector store와 기존 vecotr store 결과 값 비교

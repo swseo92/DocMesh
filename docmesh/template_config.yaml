@@ -1,0 +1,14 @@
+# config.yaml
+tiktoken_encoding: "gpt2"
+
+llm:
+  provider: "openai"
+  model: "gpt-3.5-turbo"
+  temperature: 0.0
+
+vector_store:
+  type: "faiss"
+
+embedding_model:
+  provider: "openai"
+  name: "text-embedding-ada-002"
