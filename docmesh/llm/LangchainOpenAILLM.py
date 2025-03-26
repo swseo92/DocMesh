@@ -15,5 +15,5 @@ class LangchainOpenAILLM(BaseLLM):
             SystemMessage(content="You are a helpful assistant."),
             HumanMessage(content=prompt),
         ]
-        response = self.llm(messages)
+        response = self.llm.invoke(messages)
         return response.content.strip()

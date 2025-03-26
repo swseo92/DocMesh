@@ -14,7 +14,7 @@ class QAService:
         또한, 질문과 동일한 언어로 답변하도록 요청합니다.
         """
         # FAISS 등 임베딩 기반 벡터 스토어에서 유사 문서 검색
-        search_results = self.retriever.get_relevant_documents(question)
+        search_results = self.retriever.invoke(question)
         context = "\n".join([doc.page_content for doc in search_results])
 
         # 검색 결과에서 중복 제거한 URL 목록 추출

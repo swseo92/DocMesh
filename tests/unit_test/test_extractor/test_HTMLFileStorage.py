@@ -1,93 +1,87 @@
 import os
+import re
 import hashlib
-import urllib.parse
-from docmesh.extractor.HTMLFileStorage import HTMLFileStorage, extract_original_url
+from docmesh.extractor.HTMLFileStorage import HTMLFileStorage
 
 
-def test_save_html(tmp_path):
+def test_save_html_basic(tmp_path):
     """
-    HTMLFileStorage.save_html 메서드가
-    1) HTML 상단에 주석 형태로 Original URL을 추가하는지
-    2) 예상된 파일 이름으로 파일을 저장하는지
-    3) 저장 후 반환된 경로가 실제로 존재하는지
-    등을 검증합니다.
+    save_html 메서드가 HTML 상단에 원본 URL 주석을 삽입하고,
+    파일명을 "timestamp_uuidshort_md5short.html" 형태로 만들며,
+    지정된 디렉토리에 파일을 제대로 생성하는지 확인.
     """
-
-    # 1) 테스트용 디렉토리 및 인스턴스 생성
-    save_dir = tmp_path / "html_files"
+    # 1) 임시 디렉토리 생성 및 HTMLFileStorage 인스턴스 생성
+    save_dir = tmp_path / "storage"
     storage = HTMLFileStorage(str(save_dir))
 
-    # 2) 테스트 입력 데이터
-    test_url = "http://example.com/some/path?query=test"
+    # 2) 테스트용 URL, HTML
+    test_url = "https://example.com/some/path?query=abc"
     test_html_content = "<html><body><p>Hello World</p></body></html>"
 
     # 3) save_html 호출
-    saved_file_path = storage.save_html(url=test_url, html=test_html_content)
+    saved_file_path = storage.save_html(test_url, test_html_content)
 
-    # 4) 반환된 경로가 실제로 존재하는지 확인
-    assert os.path.exists(saved_file_path), "HTML 파일이 지정된 경로에 생성되지 않았습니다."
+    # 4) 파일이 제대로 생성되었는지, 경로가 올바른지 확인
+    assert os.path.exists(saved_file_path), "파일이 생성되지 않았습니다."
+    assert saved_file_path.endswith(".html"), "파일 확장자는 .html 이어야 합니다."
 
-    # 5) 파일 내용을 확인
+    # 5) 파일 내용 검증
     with open(saved_file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # (a) 상단 주석 삽입 확인
+    # (a) 상단 주석
     assert content.startswith(
         f"<!-- Original URL: {test_url} -->"
-    ), "HTML 상단에 Original URL 주석이 삽입되지 않았습니다."
+    ), "HTML 상단에 원본 URL 주석이 삽입되지 않았습니다."
 
-    # (b) 실제 HTML 내용이 포함되어 있는지 확인
+    # (b) HTML 본문 포함 여부
     assert (
         "<html><body><p>Hello World</p></body></html>" in content
     ), "HTML 본문이 정상적으로 저장되지 않았습니다."
 
-    # (c) 파일명 검사
-    # 파일명은 "safe_url_str_{short_hash}.html" 형태여야 함
-    # safe_url_str = urllib.parse.quote_plus(url)
-    # short_hash = hashlib.md5(url.encode("utf-8")).hexdigest()[:8]
-    # filename = f"{safe_url_str}_{short_hash}.html"
-    safe_url_str = urllib.parse.quote_plus(test_url)
-    short_hash = hashlib.md5(test_url.encode("utf-8")).hexdigest()[:8]
-    expected_filename = f"{safe_url_str}_{short_hash}.html"
-    expected_path = os.path.join(str(save_dir), expected_filename)
+    # 6) 파일명 검증
+    # 예: "20250327_113045_123456_abcd1234_abcdef12.html"
+    # 실제 코드에서:
+    #   timestamp = '%Y%m%d_%H%M%S_%f'
+    #   random_part = uuid.uuid4().hex[:8]
+    #   short_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    #   filename = f"{timestamp}_{random_part}_{short_hash}.html"
+    filename = os.path.basename(saved_file_path)
 
-    # 반환된 파일 경로와 expected_path가 같은지 확인
-    assert saved_file_path == expected_path, (
-        f"파일명이 예상과 다릅니다. " f"예상: {expected_path}, 실제: {saved_file_path}"
-    )
+    # (a) 정규 표현식으로 파일명 구조 검사
+    # [날짜시각_마이크로초]_[8자리 UUID]_[8자리해시].html
+    pattern = r"^\d{8}_\d{6}_\d{6}_[0-9a-f]{8}_[0-9a-f]{8}\.html$"
+    assert re.match(pattern, filename), f"파일명 '{filename}'이 예상 형식과 다릅니다."
 
-    print("테스트 성공: save_html 메서드가 Original URL 주석 삽입 및 올바른 파일명으로 저장을 정상적으로 수행했습니다.")
+    # (b) short_hash가 올바른지 확인
+    #     url을 md5 해싱 → 16진수 → 앞 8자리와 파일명의 마지막 부분 일치 여부
+    expected_short_hash = hashlib.md5(test_url.encode("utf-8")).hexdigest()[:8]
+    actual_short_hash = filename.split("_")[-1].split(".")[0]  # 확장자 '.' 앞 8자리
+    assert (
+        actual_short_hash == expected_short_hash
+    ), f"파일명에 포함된 해시 {actual_short_hash}가 예상 {expected_short_hash}와 다릅니다."
 
 
-def test_integration_html_file_storage_and_extract_original_url(tmp_path):
+def test_save_html_multiple_calls(tmp_path):
     """
-    HTMLFileStorage.save_html로 저장한 파일을
-    extract_original_url로 다시 로드하여
-    원본 URL이 올바르게 추출되는지를 검증하는 통합 테스트.
+    짧은 시간 간격으로 여러 번 save_html를 호출해도
+    파일명이 중복되지 않고 모두 다른 파일로 저장되는지 확인.
     """
-
-    # 1) 임시 디렉토리에 저장 폴더 생성 및 스토리지 인스턴스 생성
-    save_dir = tmp_path / "html_files"
+    save_dir = tmp_path / "storage"
     storage = HTMLFileStorage(str(save_dir))
 
-    # 2) 테스트용 URL, HTML 콘텐츠
-    test_url = "https://example.com/test/page?query=abc#section"
-    test_html_content = "<html><body><h1>Hello World</h1></body></html>"
+    test_url = "http://example.com"
+    test_html_content = "<html><body>Test</body></html>"
 
-    # 3) HTML 저장
-    saved_file_path = storage.save_html(test_url, test_html_content)
+    file_paths = []
+    for _ in range(5):
+        file_path = storage.save_html(test_url, test_html_content)
+        file_paths.append(file_path)
 
-    # 4) 파일이 정상적으로 생성되었는지 확인
-    assert os.path.exists(saved_file_path), "파일이 저장되지 않았습니다."
+    # 파일들이 모두 달라야 함
+    # 중복된 파일명이 발생했다면 하나만 생성되거나 덮어쓰였을 것
+    unique_paths = set(file_paths)
+    assert len(unique_paths) == 5, "짧은 간격으로 5번 호출해도 중복 없이 5개의 파일이 생성되어야 합니다."
 
-    # 5) extract_original_url 함수를 통해 원본 URL 추출
-    extracted_url = extract_original_url(saved_file_path)
-
-    # 6) 추출된 URL이 실제 URL과 일치하는지 검증
-    assert extracted_url == test_url, (
-        f"추출된 URL이 실제 URL과 일치하지 않습니다. " f"실제: {test_url}, 추출: {extracted_url}"
-    )
-
-    print(
-        "통합 테스트 성공: HTMLFileStorage와 extract_original_url이 연동되어 원본 URL을 정상적으로 보존/추출합니다."
-    )
+    for path in unique_paths:
+        assert os.path.exists(path), f"파일이 존재하지 않습니다: {path}"

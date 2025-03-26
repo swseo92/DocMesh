@@ -30,6 +30,7 @@ ragas = "*"
 langsmith = "*"
 lxml = "*"
 rapidfuzz = "*"
+unstructured = "*"
 
 [dev-packages]
 
