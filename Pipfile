@@ -26,6 +26,10 @@ slack-bolt = "*"
 jupyter = "*"
 annoy = "*"
 matplotlib = "*"
+ragas = "*"
+langsmith = "*"
+lxml = "*"
+rapidfuzz = "*"
 
 [dev-packages]
 

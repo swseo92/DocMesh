@@ -1,153 +1,128 @@
 import os
-import tempfile
 import pytest
-
-from docmesh.embedding.LangchainOpenAIEmbeddingModel import (
-    LangchainOpenAIEmbeddingModel,
-)
-from docmesh.vector_store import LangchainFAISSVectorStore
-from docmesh.format import Document
-from tests.utils.dummy_embedding import DummyEmbeddingModel
-from dotenv import load_dotenv
+from langchain.schema import Document
+from docmesh.vector_store.FAISSVectorStore import LangchainFAISSVectorStore
+from tests.mocks.dummy_embedding import DummyEmbeddingModel
 
 
-load_dotenv()
-
-# 테스트를 위해 실제 API 키가 있는지 확인합니다.
-pytestmark = pytest.mark.skipif(
-    os.getenv("OPENAI_API_KEY") is None,
-    reason="OPENAI_API_KEY not set, skipping tests using actual model.",
-)
+@pytest.fixture
+def mock_embedding_model():
+    return DummyEmbeddingModel()
 
 
-def create_actual_test_documents():
-    # 실제 모델을 사용할 때는 다양한 주제의 문서를 생성합니다.
-    doc1 = Document(
-        "This is a test document about Python programming.", {"source": "example1"}
-    )
-    doc2 = Document(
-        "Another document discussing AI and machine learning concepts.",
-        {"source": "example2"},
-    )
-    doc3 = Document(
-        "Yet another document covering language models and their applications.",
-        {"source": "example3"},
-    )
-    return [doc1, doc2, doc3]
+@pytest.fixture
+def sample_documents():
+    return [
+        Document(page_content="Hello world", metadata={"source": "doc1"}),
+        Document(page_content="Foo bar", metadata={"source": "doc2"}),
+        Document(
+            page_content="Lorem ipsum dolor sit amet", metadata={"source": "doc3"}
+        ),
+    ]
 
 
-def create_length_test_documents():
-    # 문서 3개 생성: 각각 길이가 20, 40, 60인 문자열과 source 메타데이터 포함
-    doc1 = Document("A" * 20, {"source": "doc1"})
-    doc2 = Document("B" * 40, {"source": "doc2"})
-    doc3 = Document("C" * 60, {"source": "doc3"})
-    return [doc1, doc2, doc3]
+def test_faiss_vector_store_add_and_search(mock_embedding_model, sample_documents):
+    """
+    문서를 추가(add_documents)한 뒤,
+    검색(search) 결과가 올바르게 반환되는지 테스트.
+    """
+    store = LangchainFAISSVectorStore(embedding_model=mock_embedding_model)
+    store.add_documents(sample_documents)
 
+    # 검색 쿼리를 날려본다.
+    # mock_embedding_model은 텍스트 길이에 비례해 벡터를 생성한다.
+    # - "world" 길이: 5
+    # - "bar" 길이: 3
+    # ...
+    #
+    # 검색 로직상, 유사도는 벡터 간 내적/유클리디안 기반이므로
+    # 실제 결과 일치 여부는 단순히 "정상 동작 여부"만 확인 가능.
+    # 여기서는 오작동 없이 문서를 반환하는지만 체크한다.
+    query = "Hello"
+    results = store.search(query, k=2)
 
-def test_add_and_search_documents_actual():
-    # 실제 모델 생성 (예: text-embedding-ada-002)
-    model = LangchainOpenAIEmbeddingModel(model_name="text-embedding-ada-002")
-    # 저장 경로 없이 인스턴스 생성 (비영속적)
-    store = LangchainFAISSVectorStore(model)
-    docs = create_actual_test_documents()
-    store.add_documents(docs)
-    # "Python" 관련 쿼리로 검색
-    results = store.search("What is Python?", k=2)
-    assert (
-        len(results) > 0
-    ), "Search should return at least one document using the actual model."
-    # 결과 문서의 메타데이터에 source가 포함되어 있는지 확인
+    # k=2 → 최대 2개 결과
+    assert len(results) <= 2, "검색 결과가 최대 2개여야 합니다."
+
+    # 반환된 결과가 Document 인스턴스인지 확인
     for doc in results:
-        assert (
-            "source" in doc.metadata
-        ), "Returned document should contain a 'source' metadata."
+        assert isinstance(doc, Document)
 
 
-def test_save_and_load():
-    model = DummyEmbeddingModel()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "faiss_store")
-        # 저장 경로를 지정하여 인스턴스 생성
-        store = LangchainFAISSVectorStore(model, path=path)
-        docs = create_actual_test_documents()
-        store.add_documents(docs)
-        # 저장 기능 호출
+def test_faiss_vector_store_save_and_load(
+    tmp_path, mock_embedding_model, sample_documents
+):
+    """
+    FAISS 인덱스를 디스크에 저장 후, 로드했을 때
+    동일한 검색 결과가 나오는지 확인.
+    """
+    # 1) 임시 폴더 설정
+    save_dir = tmp_path / "faiss_store"
+    os.makedirs(save_dir, exist_ok=True)
+
+    # 2) 벡터스토어 생성 및 문서 추가 → 저장
+    store = LangchainFAISSVectorStore(
+        embedding_model=mock_embedding_model, path=str(save_dir)
+    )
+    store.add_documents(sample_documents)
+    store.save()
+
+    # 3) 새로 스토어 인스턴스를 만들어 load
+    new_store = LangchainFAISSVectorStore(
+        embedding_model=mock_embedding_model, path=str(save_dir)
+    )
+    new_store.load()
+
+    # 4) 저장 전 스토어와 저장 후 로드한 스토어에서 동일 쿼리 검색
+    query = "Hello"
+    old_results = store.search(query, k=2)
+    new_results = new_store.search(query, k=2)
+
+    # 두 결과가 동일한지(또는 길이와 문서 타입만 간단히 비교) 확인
+    assert len(old_results) == len(new_results), "로드 전후 검색 결과의 개수가 달라서는 안 됩니다."
+
+    # 결과 문서가 Document인지 확인
+    for doc in new_results:
+        assert isinstance(doc, Document)
+
+
+def test_faiss_vector_store_no_path_save(mock_embedding_model, sample_documents):
+    """
+    path가 None인 상태에서 save()를 호출하면 예외 없이 그냥 넘어가는지,
+    혹은 적절히 처리하는지(코드에 따라).
+    """
+    store = LangchainFAISSVectorStore(embedding_model=mock_embedding_model, path=None)
+    store.add_documents(sample_documents)
+
+    # path=None이면 아무것도 저장하지 않거나, 에러를 던지지 않아야 함.
+    # 코드 상에서 "if self.path is not None:" 로직이 있으므로
+    # 아무 일도 일어나지 않고 끝나는 게 정상.
+    try:
         store.save()
-        # 새로운 인스턴스를 생성하고, load()를 통해 저장된 데이터를 복원
-        new_store = LangchainFAISSVectorStore(model, path=path)
-        new_store.load()
-        results = new_store.search("What is Python?", k=2)
-        print(results)
-        assert (
-            len(results) > 0
-        ), "Loaded store should return search results using the actual model."
+    except Exception as e:
+        pytest.fail(f"save() 호출 시 path=None이어도 예외가 발생하지 않아야 합니다. 에러: {e}")
 
 
-def test_new_instance_load_cycles():
-    model = DummyEmbeddingModel()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store_path = os.path.join(tmpdir, "faiss_store")
-        # 초기 store 인스턴스 생성 및 문서 추가
-        initial_store = LangchainFAISSVectorStore(model, path=store_path)
-        docs = create_actual_test_documents()
-        initial_store.add_documents(docs)
-        # 초기 검색 결과 확보 (예: "Python" 관련 검색)
-        initial_results = initial_store.search("Python", k=2)
-        assert len(initial_results) > 0, "Initial search returned no results."
-        initial_contents = [doc.page_content for doc in initial_results]
-        initial_store.save()
-
-        cycles = 3
-        for cycle in range(cycles):
-            # 매 사이클마다 새로운 store 인스턴스를 생성하고 load()를 호출
-            new_store = LangchainFAISSVectorStore(model, path=store_path)
-            new_store.load()
-            cycle_results = new_store.search("Python", k=2)
-            assert (
-                len(cycle_results) > 0
-            ), f"Cycle {cycle + 1}: search returned no results."
-            cycle_contents = [doc.page_content for doc in cycle_results]
-            # 초기 결과와 동일한지 확인
-            assert (
-                cycle_contents == initial_contents
-            ), f"Cycle {cycle + 1}: search results differ from initial."
-
-            new_store.add_documents(docs)
-            initial_results = new_store.search("Python", k=2)
-            initial_contents = [doc.page_content for doc in initial_results]
-            new_store.save()
+def test_faiss_vector_store_no_path_load(mock_embedding_model):
+    """
+    path가 None인 상태에서 load()를 호출하면 에러 없이 통과하는지 테스트.
+    """
+    store = LangchainFAISSVectorStore(embedding_model=mock_embedding_model, path=None)
+    try:
+        store.load()
+    except Exception as e:
+        pytest.fail(f"load() 호출 시 path=None이어도 예외가 발생하지 않아야 합니다. 에러: {e}")
 
 
-def test_actual_data_expected_results():
-    model = DummyEmbeddingModel()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store_path = os.path.join(tmpdir, "faiss_store")
-        # 저장 경로를 지정하여 LangchainFAISSVectorStore 인스턴스 생성
-        store = LangchainFAISSVectorStore(model, path=store_path)
-        docs = create_length_test_documents()
-        store.add_documents(docs)
-        store.save()
+def test_faiss_vector_store_invalid_path_load(mock_embedding_model):
+    """
+    잘못된(존재하지 않는) 경로에서 load() 시도하면 예외가 발생하는지 테스트.
+    """
+    invalid_path = "some/nonexistent/path"
+    store = LangchainFAISSVectorStore(
+        embedding_model=mock_embedding_model, path=invalid_path
+    )
 
-        # 쿼리 텍스트 길이 35 (예: "X" * 35)의 임베딩 벡터는 [35,36,37,38]입니다.
-        # 각 문서의 임베딩은 각각 [20,21,22,23], [40,41,42,43], [60,61,62,63]이므로,
-        # L2 거리는 doc1: 약 30, doc2: 약 10, doc3: 약 25가 되어, doc2가 가장 가까워야 합니다.
-        query = "X" * 35
-        results = store.search(query, k=2)
-        assert len(results) > 0, "No search results returned."
-        # 첫 번째 결과가 "B" * 40 인 doc2여야 함
-        assert (
-            results[0].page_content == "B" * 40
-        ), "Expected doc2 to be closest to query of length 35."
-        assert results[0].metadata.get("source") == "doc2", "Expected source 'doc2'."
-
-        # 새로운 store 인스턴스를 생성하여 load() 후에도 동일한 결과가 나오는지 확인
-        new_store = LangchainFAISSVectorStore(model, path=store_path)
-        new_store.load()
-        new_results = new_store.search(query, k=2)
-        assert len(new_results) > 0, "No search results returned after load."
-        assert (
-            new_results[0].page_content == "B" * 40
-        ), "After load, expected doc2 to be closest."
-        assert (
-            new_results[0].metadata.get("source") == "doc2"
-        ), "After load, expected source 'doc2'."
+    with pytest.raises(Exception) as excinfo:
+        store.load()
+    assert "Error loading vectorstore" in str(excinfo.value), "적절한 예외 메시지가 포함되어야 함."

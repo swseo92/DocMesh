@@ -1,4 +1,7 @@
 class Config:
+    # tiktoken 관련 설정
+    TIKTOKEN_ENCODING = "gpt2"
+
     # LLM 관련 설정
     # 사용할 LLM provider 및 모델 설정 (예: "langchain" 또는 추후 다른 provider)
     LLM_PROVIDER = "langchain"

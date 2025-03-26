@@ -1,5 +1,6 @@
 import os
 import faiss
+from langchain.schema import Document
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
 from docmesh.embedding.BaseEmbeddingModel import BaseEmbeddingModel
@@ -22,15 +23,8 @@ class LangchainFAISSVectorStore:
     def set_path(self, path: str):
         self.path = path
 
-    def add_documents(self, documents: list) -> None:
-        lc_documents = []
-        for doc in documents:
-            # 문서가 to_langchain_document() 메서드를 갖고 있으면 변환, 아니면 그대로 사용
-            if hasattr(doc, "to_langchain_document"):
-                lc_documents.append(doc.to_langchain_document())
-            else:
-                lc_documents.append(doc)
-        self.vectorstore.add_documents(lc_documents)
+    def add_documents(self, documents: list[Document]) -> None:
+        self.vectorstore.add_documents(documents)
 
     def search(self, query: str, k: int = 3) -> list:
         return self.vectorstore.similarity_search(query, k=k)
